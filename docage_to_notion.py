@@ -25,9 +25,8 @@ load_dotenv(os.path.expanduser("~/automations/.env"))
 
 DOCAGE_EMAIL      = os.environ["DOCAGE_EMAIL"]
 DOCAGE_API_KEY    = os.environ["DOCAGE_API_KEY"]
-NOTION_API_KEY    = os.environ["NOTION_API_KEY"]
-NOTION_CLIENTS_DB = os.getenv("NOTION_DATABASE_ID", "345afa74cfc9802ba2b9ecfc5c197996")
-NOTION_EVENTS_DB  = "35eafa74cfc980d092d0e80644bd6be7"
+NOTION_API_KEY   = os.environ["NOTION_API_KEY"]
+NOTION_EVENTS_DB = "35eafa74cfc980d092d0e80644bd6be7"
 
 DOCAGE_BASE = "https://api.docage.com"
 NOTION_BASE = "https://api.notion.com/v1"
@@ -154,56 +153,27 @@ class NotionClient:
             body["start_cursor"] = cursor
         return self._post(f"/databases/{db_id}/query", body)
 
-    def load_all_clients(self) -> dict[str, dict]:
-        """Load ALL clients into a dict keyed by lowercased email."""
-        clients: dict[str, dict] = {}
-        cursor = None
-        while True:
-            res = self.query_db(NOTION_CLIENTS_DB, cursor=cursor)
-            for page in res.get("results", []):
-                props = page.get("properties", {})
-                title_parts = props.get("Email", {}).get("title", [])
-                email = title_parts[0]["plain_text"].strip().lower() if title_parts else ""
-                if email:
-                    clients[email] = page
-            if not res.get("has_more"):
-                break
-            cursor = res.get("next_cursor")
-        log.info(f"Notion: {len(clients)} clients chargés")
-        return clients
-
     def load_all_events(self) -> dict[str, list[dict]]:
-        """Load ALL events grouped by client page ID (list per client)."""
+        """Load ALL events grouped by email (title field)."""
         events: dict[str, list[dict]] = {}
         cursor = None
         while True:
             res = self.query_db(NOTION_EVENTS_DB, cursor=cursor)
             for page in res.get("results", []):
-                relations = page.get("properties", {}).get("Client", {}).get("relation", [])
-                client_id = relations[0]["id"] if relations else ""
-                if client_id:
-                    events.setdefault(client_id, []).append(page)
+                props = page.get("properties", {})
+                title_parts = props.get("Email", {}).get("title", [])
+                email = title_parts[0]["plain_text"].strip().lower() if title_parts else ""
+                if email:
+                    events.setdefault(email, []).append(page)
             if not res.get("has_more"):
                 break
             cursor = res.get("next_cursor")
         total = sum(len(v) for v in events.values())
-        log.info(f"Notion: {total} événements chargés ({len(events)} clients)")
+        log.info(f"Notion: {total} événements chargés ({len(events)} élèves)")
         return events
 
     def archive_page(self, page_id: str) -> None:
         self._patch(f"/pages/{page_id}", {"archived": True})
-
-    def create_client(self, first_name: str, last_name: str, email: str, docage_id: str) -> dict:
-        nom = f"{first_name} {last_name}".strip() or email
-        return self._post("/pages", {
-            "parent": {"database_id": NOTION_CLIENTS_DB},
-            "properties": {
-                "Email":              {"title": [{"text": {"content": email}}]},
-                "Nom":                {"rich_text": [{"text": {"content": nom}}]},
-                "Prénom":             {"rich_text": [{"text": {"content": first_name.strip()}}]},
-                "Identifiant client": {"rich_text": [{"text": {"content": docage_id}}]},
-            },
-        })
 
     def create_event(self, props: dict) -> dict:
         return self._post("/pages", {
@@ -230,17 +200,17 @@ def resolve_event(client_events: list[dict]) -> tuple[Optional[dict], list[dict]
 
 # ── Build Notion event properties ───────────────────────────────────────────────
 
-def build_event_props(entry: dict, first_name: str, last_name: str, client_page_id: str) -> dict:
+def build_event_props(entry: dict, first_name: str, last_name: str, email: str) -> dict:
     status_int    = entry.get("TransactionStatus", 0)
     notion_status = map_status(status_int)
     sent_date     = parse_date(entry.get("CreationDate"))
     reminder_date = parse_date(entry.get("ModificationDate")) if notion_status == "Relancé" else None
-    titre         = f"{first_name} {last_name}".strip() or "Sans nom"
+    nom           = f"{first_name} {last_name}".strip() or email
 
     props: dict = {
-        "Titre":                 {"title": [{"text": {"content": titre}}]},
+        "Email":                 {"title": [{"text": {"content": email}}]},
+        "Titre":                 {"rich_text": [{"text": {"content": nom}}]},
         "Statut contrat envoyé": {"select": {"name": notion_status}},
-        "Client":                {"relation": [{"id": client_page_id}]},
     }
     if sent_date:
         props["Date contrat envoyé"] = {"date": {"start": sent_date}}
@@ -257,8 +227,7 @@ def sync(resend_unsigned: bool = False) -> None:
     notion = NotionClient()
 
     # Chargement bulk upfront — garantit qu'on cherche dans TOUTES les entrées existantes
-    clients_by_email  = notion.load_all_clients()    # {email_lower: page}
-    events_by_client  = notion.load_all_events()     # {client_page_id: [pages]}
+    events_by_email = notion.load_all_events()  # {email_lower: [pages]}
 
     boxes = docage.get_all_boxes()
     log.info(f"{len(boxes)} box(es) found in Docage")
@@ -299,22 +268,13 @@ def sync(resend_unsigned: bool = False) -> None:
                 log.warning(f"  Contact {contact_id} has no email, skipping")
                 continue
 
-            # ── Notion client : cherche dans TOUTES les fiches existantes ────
-            client_page = clients_by_email.get(email.lower())
-            if client_page:
-                client_page_id = client_page["id"]
-                log.info(f"  Client found   : {email}")
-            else:
-                client_page    = notion.create_client(first_name, last_name, email, contact_id)
-                client_page_id = client_page["id"]
-                clients_by_email[email.lower()] = client_page
-                log.info(f"  Client created : {email}")
+            email_key = email.lower()
 
-            # ── Notion event : une seule ligne par client ──────────────────────
-            titre        = f"{first_name} {last_name}".strip() or "Sans nom"
-            props        = build_event_props(entry, first_name, last_name, client_page_id)
-            client_evts  = events_by_client.get(client_page_id, [])
-            to_keep, to_archive = resolve_event(client_evts)
+            # ── Notion event : une seule fiche par email dans Élèves ──────────
+            nom          = f"{first_name} {last_name}".strip() or email
+            props        = build_event_props(entry, first_name, last_name, email)
+            eleve_evts   = events_by_email.get(email_key, [])
+            to_keep, to_archive = resolve_event(eleve_evts)
 
             for dup in to_archive:
                 notion.archive_page(dup["id"])
@@ -322,12 +282,12 @@ def sync(resend_unsigned: bool = False) -> None:
 
             if to_keep:
                 notion.update_event(to_keep["id"], props)
-                events_by_client[client_page_id] = [to_keep]
-                log.info(f"  Event updated  : {titre}")
+                events_by_email[email_key] = [to_keep]
+                log.info(f"  Event updated  : {nom}")
             else:
                 new_event = notion.create_event(props)
-                events_by_client[client_page_id] = [new_event]
-                log.info(f"  Event created  : {titre}")
+                events_by_email[email_key] = [new_event]
+                log.info(f"  Event created  : {nom}")
 
             # ── Resend uniquement si statut == "En attente" ─────────────────
             transaction_id = entry.get("TransactionId", "")
@@ -339,8 +299,7 @@ def sync(resend_unsigned: bool = False) -> None:
                 try:
                     docage.resend_transaction(transaction_id)
                     log.info(f"  Resent OK : {transaction_id}")
-                    # Mettre à jour le statut à "Relancé" dans Notion
-                    event_page = events_by_client.get(client_page_id, [None])[0]
+                    event_page = events_by_email.get(email_key, [None])[0]
                     if event_page:
                         notion.update_event(event_page["id"], {
                             "Statut contrat envoyé": {"select": {"name": "Relancé"}},

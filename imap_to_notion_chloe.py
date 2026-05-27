@@ -22,9 +22,7 @@ load_dotenv()
 
 ANTHROPIC_API_KEY    = os.environ["ANTHROPIC_API_KEY"]
 NOTION_API_KEY       = os.environ["NOTION_API_KEY"]
-NOTION_CLIENTS_DB    = os.environ.get("NOTION_DATABASE_ID", "345afa74cfc9802ba2b9ecfc5c197996")
-NOTION_EVENTS_DB     = os.environ.get("NOTION_EVENTS_DATABASE_ID", "35eafa74cfc980d092d0e80644bd6be7")
-NOTION_RELATION_PROP = "Client"
+NOTION_EVENTS_DB = os.environ.get("NOTION_EVENTS_DATABASE_ID", "35eafa74cfc980d092d0e80644bd6be7")
 
 _DIR          = os.path.dirname(os.path.abspath(__file__))
 GMAIL_TOKEN   = os.path.join(_DIR, "token.json")
@@ -419,12 +417,6 @@ def parse_calendly_email(em: dict) -> dict:
 
 # Notion
 
-def load_all_clients_bulk(notion: NotionClient) -> tuple[dict, dict]:
-    """Clients DB inaccessible en query — retourne des dicts vides."""
-    print("  Clients DB : liaison désactivée (pas d'accès query)")
-    return {}, {}
-
-
 def load_all_events_bulk(notion: NotionClient) -> dict:
     """Charge tous les événements dans {email_addr: [pages]}."""
     events, cursor = {}, None
@@ -459,32 +451,6 @@ def cleanup_event_duplicates(notion: NotionClient, events_cache: dict) -> None:
         events_cache[cid] = events_cache[cid][:1]
 
 
-def normalize_event_titles(notion: NotionClient, events_cache: dict, clients_by_id: dict) -> None:
-    """Renomme les événements dont le titre ne correspond pas à 'Prénom Nom' du client."""
-    renamed = 0
-    for client_id, pages in events_cache.items():
-        expected = clients_by_id.get(client_id, "")
-        if not expected:
-            continue
-        for page in pages:
-            parts   = page.get("properties", {}).get("Titre", {}).get("title", [])
-            current = parts[0]["plain_text"] if parts else ""
-            if current != expected:
-                _notion_call(notion.pages.update, page_id=page["id"], properties={
-                    "Titre": {"title": [{"text": {"content": expected}}]}
-                })
-                renamed += 1
-    if renamed:
-        print(f"  {renamed} titre(s) normalisé(s) -> 'Prénom Nom'")
-
-
-def find_client(notion: NotionClient, clients_cache: dict,
-                email_addr: str, prenom: str = "", nom: str = "") -> str | None:
-    if email_addr:
-        return clients_cache.get(email_addr.lower().strip())
-    return None
-
-
 def _notion_call(fn, *args, retries: int = 3, **kwargs):
     """Exécute un appel Notion avec retries sur timeout."""
     for attempt in range(retries):
@@ -509,7 +475,7 @@ def _format_resume_entry(date_mail: str, resume: str) -> str:
     return resume
 
 
-def upsert_event(notion: NotionClient, events_cache: dict, client_id: str | None,
+def upsert_event(notion: NotionClient, events_cache: dict,
                  titre: str, email_addr: str, date_mail: str,
                  info_calendly: str, resume: str, boite: str = "") -> tuple[str, bool]:
     """Met à jour l'événement existant (clé = email_addr), ou en crée un. Retourne (page_id, created)."""
@@ -548,8 +514,7 @@ def upsert_event(notion: NotionClient, events_cache: dict, client_id: str | None
 
 # Processing
 
-def process_email(notion: NotionClient, em: dict,
-                  clients_cache: dict, events_cache: dict) -> None:
+def process_email(notion: NotionClient, em: dict, events_cache: dict) -> None:
     sender_email = extract_email_from_header(em["from"])
     date_mail    = parse_date_header(em["date"])
 
@@ -566,14 +531,10 @@ def process_email(notion: NotionClient, em: dict,
         info_calendly = " - ".join(p for p in ["Calendly", type_evt.capitalize(), date_label] if p)
         titre = nom_eleve.strip() if nom_eleve else (email_eleve.split("@")[0] if email_eleve else "Sans nom")
 
-        parts     = nom_eleve.strip().split(" ", 1) if nom_eleve else []
-        client_id = find_client(notion, clients_cache, email_eleve,
-                                 parts[0] if parts else "",
-                                 parts[1] if len(parts) > 1 else "")
-        _, created = upsert_event(notion, events_cache, client_id, titre,
+        _, created = upsert_event(notion, events_cache, titre,
                                   email_eleve, date_mail, info_calendly, "", em.get("boite", ""))
         action = "Cree" if created else "Mis a jour"
-        print(f"  OK {action} : {titre}" + (" (client lie)" if client_id else ""))
+        print(f"  OK {action} : {titre}")
 
     else:
         result = classify_email(em)
@@ -583,17 +544,15 @@ def process_email(notion: NotionClient, em: dict,
 
         prenom    = result.get("prenom", "")
         nom       = result.get("nom", "")
-        type_dem  = result.get("type_demande", "mail")
         resume    = result.get("resume_message", "")
         date_mail = result.get("date_mail") or date_mail
 
         titre = f"{prenom} {nom}".strip() or sender_email.split("@")[0] or "Sans nom"
 
-        client_id = find_client(notion, clients_cache, sender_email, prenom, nom)
-        _, created = upsert_event(notion, events_cache, client_id, titre,
+        _, created = upsert_event(notion, events_cache, titre,
                                   sender_email, date_mail, "", resume, em.get("boite", ""))
         action = "Cree" if created else "Mis a jour"
-        print(f"  OK {action} : {titre}" + (" (client lie)" if client_id else ""))
+        print(f"  OK {action} : {titre}")
 
 
 # Main
@@ -602,8 +561,7 @@ def main():
     notion = NotionClient(auth=NOTION_API_KEY)
 
     print("Chargement des donnees Notion...")
-    clients_cache, clients_by_id = load_all_clients_bulk(notion)
-    events_cache  = load_all_events_bulk(notion)
+    events_cache = load_all_events_bulk(notion)
     cleanup_event_duplicates(notion, events_cache)
 
     print(f"Connexion IMAP (fenetre : {DAYS_BACK} jours)...")
@@ -624,7 +582,7 @@ def main():
     for em in all_emails:
         print(f"[{em['source'].upper()}] {em['subject'][:60]}")
         try:
-            process_email(notion, em, clients_cache, events_cache)
+            process_email(notion, em, events_cache)
         except (json.JSONDecodeError, ValueError) as e:
             print(f"  Erreur : {e}")
 
