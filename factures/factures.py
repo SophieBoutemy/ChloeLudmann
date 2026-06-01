@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""
-Detecte les factures dans les boites mail IMAP et cree les entrees dans Notion.
-Usage : python factures.py
-"""
-import os, imaplib, email, email.header
-from datetime import datetime
+# Detecte les factures dans les boites mail IMAP, uploade sur Drive, cree les entrees Notion.
+import os, imaplib, email, email.header, io, base64
+from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
 
 from dotenv import load_dotenv
@@ -13,10 +10,12 @@ import requests
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-NOTION_API_KEY = os.environ['NOTION_API_KEY']
-NOTION_DB_ID   = '327afa74cfc980328301eec9bb7996e5'
-ANTHROPIC_KEY  = os.environ['ANTHROPIC_API_KEY']
-CLAUDE_MODEL   = 'claude-haiku-4-5-20251001'
+NOTION_API_KEY       = os.environ['NOTION_API_KEY']
+NOTION_DB_ID         = '327afa74cfc980328301eec9bb7996e5'
+ANTHROPIC_KEY        = os.environ['ANTHROPIC_API_KEY']
+CLAUDE_MODEL         = 'claude-haiku-4-5-20251001'
+DRIVE_FOLDER_ID      = os.environ.get('DRIVE_FOLDER_ID', '')
+TOKEN_FILE = os.path.join(os.path.dirname(__file__), '..', 'token.json')
 
 MAILBOXES = [
     {
@@ -33,18 +32,11 @@ MAILBOXES = [
         'host':     'mail.infomaniak.com',
         'port':     993,
     },
-    {
-        'label':    'Gmail',
-        'email':    os.environ.get('GMAIL_IMAP_EMAIL', 'bour.chloe0@gmail.com'),
-        'password': os.environ['GMAIL_AUTOMATION_PASSWORD'],
-        'host':     'imap.gmail.com',
-        'port':     993,
-    },
 ]
 
 # ── Claude ────────────────────────────────────────────────────────────────────
 
-INVOICE_KEYWORDS = {'invoice', 'facture', 'inv', 'receipt', 'recu', 'recus'}
+INVOICE_KEYWORDS = {'invoice', 'facture', 'inv', 'receipt', 'recu', 'recus', 'billing', 'statement', 'payment confirmation', 'order confirmation'}
 
 def _contains_keyword(text: str) -> bool:
     t = text.lower()
@@ -71,20 +63,84 @@ def is_invoice(filename: str, subject: str) -> bool:
     )
     return 'oui' in response.content[0].text.strip().lower()
 
+# ── Google Drive ──────────────────────────────────────────────────────────────
+
+def _drive_service():
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    creds = Credentials.from_authorized_user_file(
+        TOKEN_FILE,
+        scopes=['https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/drive.file'],
+    )
+    return build('drive', 'v3', credentials=creds)
+
+def _get_or_create_year_folder(svc, year: str) -> str:
+    q = (f"name='{year}' and '{DRIVE_FOLDER_ID}' in parents "
+         f"and mimeType='application/vnd.google-apps.folder' and trashed=false")
+    res = svc.files().list(q=q, fields='files(id)').execute()
+    files = res.get('files', [])
+    if files:
+        return files[0]['id']
+    meta = {
+        'name': year,
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [DRIVE_FOLDER_ID],
+    }
+    return svc.files().create(body=meta, fields='id').execute()['id']
+
+def upload_to_drive(filename: str, pdf_bytes: bytes, year: str) -> str:
+    if not DRIVE_FOLDER_ID or not os.path.exists(TOKEN_FILE):
+        return ''
+    try:
+        from googleapiclient.http import MediaIoBaseUpload
+        svc = _drive_service()
+        folder_id = _get_or_create_year_folder(svc, year)
+        media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype='application/pdf')
+        meta = {'name': filename, 'parents': [folder_id]}
+        f = svc.files().create(body=meta, media_body=media, fields='id,webViewLink').execute()
+        return f.get('webViewLink', '')
+    except Exception as e:
+        print(f"    Drive erreur : {e}")
+        return ''
+
 # ── Notion ────────────────────────────────────────────────────────────────────
 
-def create_notion_entry(nom: str, date_reception: str, expediteur: str):
+def create_notion_entry(nom: str, date_reception: str, expediteur: str, drive_link: str = ''):
     headers = {
         'Authorization': f'Bearer {NOTION_API_KEY}',
         'Notion-Version': '2022-06-28',
         'Content-Type': 'application/json',
     }
+    r = requests.post(
+        f'https://api.notion.com/v1/databases/{NOTION_DB_ID}/query',
+        headers=headers,
+        json={'filter': {'property': 'Nom de la facture', 'title': {'equals': nom}}},
+    )
+    existing = r.json().get('results', []) if r.ok else []
+    if existing:
+        page_id = existing[0]['id']
+        if drive_link:
+            r = requests.patch(
+                f'https://api.notion.com/v1/pages/{page_id}',
+                headers=headers,
+                json={'properties': {'Lien Drive': {'url': drive_link}}},
+            )
+            if not r.ok:
+                print(f"    Notion erreur MAJ {r.status_code}: {r.text[:300]}")
+            else:
+                print(f"    Notion MAJ lien Drive OK")
+        else:
+            print(f"    Notion doublon ignore")
+        return
     props = {
         'Nom de la facture':     {'title': [{'text': {'content': nom}}]},
         'Date de réception':     {'date': {'start': date_reception}},
         'Expéditeur':            {'rich_text': [{'text': {'content': expediteur}}]},
         'Envoyé à la comptable': {'checkbox': False},
     }
+    if drive_link:
+        props['Lien Drive'] = {'url': drive_link}
     r = requests.post('https://api.notion.com/v1/pages', headers=headers, json={
         'parent': {'database_id': NOTION_DB_ID},
         'properties': props,
@@ -117,7 +173,6 @@ def reset_ovh_factures():
     conn.login(mb['email'], mb['password'])
     conn.select('INBOX')
 
-    # Sujets ASCII identifiant les emails de factures traites
     invoice_subjects = [
         'Your receipt from Calendly LLC',
         '5124603268',
@@ -144,7 +199,8 @@ def process_mailbox(mb: dict):
         return
 
     conn.select('INBOX')
-    _, data = conn.search(None, 'UNSEEN')
+    since_date = (datetime.today() - timedelta(days=10)).strftime('%d-%b-%Y')
+    _, data = conn.search(None, f'(UNSEEN SINCE {since_date})')
     uids = [u for u in data[0].split() if u]
     print(f"  {len(uids)} email(s) non lu(s)")
 
@@ -160,8 +216,10 @@ def process_mailbox(mb: dict):
         try:
             received_dt  = parsedate_to_datetime(date_str)
             received_iso = received_dt.date().isoformat()
+            year         = str(received_dt.year)
         except Exception:
             received_iso = datetime.today().date().isoformat()
+            year         = str(datetime.today().year)
 
         pdfs = []
         for part in msg.walk():
@@ -173,17 +231,20 @@ def process_mailbox(mb: dict):
             if ct == 'application/pdf' or fname.lower().endswith('.pdf'):
                 payload = part.get_payload(decode=True)
                 if payload:
-                    pdfs.append(fname)
+                    pdfs.append((fname, payload))
 
         if not pdfs:
             conn.store(uid, '+FLAGS', '\\Seen')
             continue
 
-        for filename in pdfs:
+        for filename, pdf_bytes in pdfs:
             print(f"  PDF : {filename} | {subject[:50]}")
             if is_invoice(filename, subject):
                 print(f"    -> Facture detectee")
-                create_notion_entry(filename, received_iso, sender)
+                drive_link = upload_to_drive(filename, pdf_bytes, year)
+                if drive_link:
+                    print(f"    Drive OK : {drive_link[:60]}")
+                create_notion_entry(filename, received_iso, sender, drive_link)
             else:
                 print(f"    -> Pas une facture, ignore")
 
@@ -191,12 +252,88 @@ def process_mailbox(mb: dict):
 
     conn.logout()
 
+
+# ── Gmail OAuth ───────────────────────────────────────────────────────────────
+
+def get_gmail_service():
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+    creds = Credentials.from_authorized_user_file(
+        TOKEN_FILE,
+        scopes=['https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/drive.file'],
+    )
+    if not creds.valid and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        with open(TOKEN_FILE, 'w') as f:
+            f.write(creds.to_json())
+    return build('gmail', 'v1', credentials=creds)
+
+def _gmail_get_pdf_parts(payload: dict) -> list:
+    parts = []
+    att_id = payload.get('body', {}).get('attachmentId')
+    if att_id and payload.get('filename'):
+        fname = payload['filename']
+        ct = payload.get('mimeType', '')
+        if ct == 'application/pdf' or fname.lower().endswith('.pdf'):
+            parts.append((fname, att_id))
+    for p in payload.get('parts', []):
+        parts.extend(_gmail_get_pdf_parts(p))
+    return parts
+
+def process_gmail_oauth(days: int = 10):
+    print(f"\n[Gmail OAuth] Connexion via token.json...")
+    try:
+        svc = get_gmail_service()
+        since = (datetime.today() - timedelta(days=days)).strftime('%Y/%m/%d')
+        result = svc.users().messages().list(
+            userId='me',
+            q=f'after:{since} in:inbox has:attachment',
+            maxResults=500,
+        ).execute()
+        msg_ids = [m['id'] for m in result.get('messages', [])]
+        print(f"  {len(msg_ids)} email(s) avec pieces jointes")
+
+        for msg_id in msg_ids:
+            full = svc.users().messages().get(userId='me', id=msg_id, format='full').execute()
+            hdrs = {h['name']: h['value'] for h in full['payload']['headers']}
+            subject  = hdrs.get('Subject', '')
+            sender   = hdrs.get('From', '')
+            date_str = hdrs.get('Date', '')
+            try:
+                received_dt  = parsedate_to_datetime(date_str)
+                received_iso = received_dt.date().isoformat()
+                year         = str(received_dt.year)
+            except Exception:
+                received_iso = datetime.today().date().isoformat()
+                year         = str(datetime.today().year)
+
+            pdf_parts = _gmail_get_pdf_parts(full['payload'])
+            for filename, att_id in pdf_parts:
+                print(f"  PDF : {filename} | {subject[:50]}")
+                if is_invoice(filename, subject):
+                    print(f"    -> Facture detectee")
+                    att = svc.users().messages().attachments().get(
+                        userId='me', messageId=msg_id, id=att_id,
+                    ).execute()
+                    pdf_bytes = base64.urlsafe_b64decode(att['data'])
+                    drive_link = upload_to_drive(filename, pdf_bytes, year)
+                    if drive_link:
+                        print(f"    Drive OK : {drive_link[:60]}")
+                    create_notion_entry(filename, received_iso, sender, drive_link)
+                else:
+                    print(f"    -> Pas une facture, ignore")
+    except Exception as e:
+        print(f"  Erreur Gmail OAuth : {e}")
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
     reset_ovh_factures()
     for mb in MAILBOXES:
         process_mailbox(mb)
+    process_gmail_oauth()
     print("\nTermine.")
 
 if __name__ == '__main__':

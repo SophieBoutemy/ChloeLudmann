@@ -3,16 +3,15 @@ import smtplib
 from datetime import datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from urllib.parse import quote as _urlencode
 from dotenv import load_dotenv
 
 load_dotenv(os.path.expanduser("~/automations/.env"))
 
 SMTP_HOST    = "smtp.gmail.com"
 SMTP_PORT    = 587
-SMTP_USER    = "automationschloe@gmail.com"
+SMTP_USER    = "automatisationschloe@gmail.com"
 SMTP_PASS    = os.environ.get("GMAIL_AUTOMATION_PASSWORD", "")
-MAIL_FROM    = "Chloé Ludmann <automationschloe@gmail.com>"
+MAIL_FROM    = "Chloé Ludmann <automatisationschloe@gmail.com>"
 CALENDLY_URL = os.environ.get("CALENDLY_URL", "")
 
 ADMIN_EMAIL   = "contact@chloeludmann.fr"
@@ -64,7 +63,7 @@ def _fmt_slot(start_time: str, end_time: str) -> str:
         return start_time
 
 
-def _html_notification(name: str, event_name: str, start_time: str, end_time: str = "", booking_url: str = "", email: str = "") -> str:
+def _html_notification(name: str, event_name: str, start_time: str, end_time: str = "") -> str:
     prenom   = name.split()[0] if name else ""
     greeting = f"Bonjour {prenom} !" if prenom else "Bonjour !"
     slot_text = _fmt_slot(start_time, end_time)
@@ -74,7 +73,6 @@ def _html_notification(name: str, event_name: str, start_time: str, end_time: st
             f'<p style="margin:0 0 32px 0;font-size:17px;font-weight:700;color:#EA4F26">'
             f'{slot_text}</p>'
         )
-    unsubscribe_url = f"https://automations.chloeludmann.fr/unsubscribe?email={_urlencode(email)}"
     return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -97,19 +95,11 @@ def _html_notification(name: str, event_name: str, start_time: str, end_time: st
       <p style="margin:0 0 24px 0;font-size:16px;color:#222;font-weight:500">{greeting}</p>
       <p style="margin:0 0 20px 0;font-size:15px;color:#333">Un créneau vient de se libérer :</p>
       {slot_block}
-      <a href="{booking_url or CALENDLY_URL}"
+      <a href="{CALENDLY_URL}"
          style="display:inline-block;background:#EA4F26;color:#ffffff;font-size:15px;
                 font-weight:700;text-decoration:none;padding:14px 36px;border-radius:6px;
                 letter-spacing:0.3px">
         Réserver ce créneau
-      </a>
-    </div>
-
-    <!-- Unsubscribe -->
-    <div style="background:#ffffff;padding:0 32px 28px 32px;text-align:center">
-      <a href="{unsubscribe_url}"
-         style="font-size:12px;color:#aaa;text-decoration:underline">
-        Se désinscrire de la liste d'attente
       </a>
     </div>
 
@@ -184,42 +174,35 @@ def send_admin_notification(name: str, email: str, total: int) -> None:
     import smtplib
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = f"Nouvelle inscription liste d'attente — {name}"
-    msg['From'] = f'Chloe Ludmann <{SMTP_USER}>'
-    msg['To'] = ADMIN_EMAIL
+    subject = f"Nouvelle inscription liste d\u2019attente \u2014 {name}"
     html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
-</head><body style="margin:0;padding:0;background:#F8EFE2;font-family:Roboto,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:30px 0;">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#F8EFE2;">
-<tr><td style="background:#419958;padding:24px 32px;border-radius:8px 8px 0 0;">
-<span style="color:#ffffff;font-size:20px;font-weight:bold;">Nouvelle inscription — liste d'attente</span>
-</td></tr>
-<tr><td style="padding:32px;background:#ffffff;">
-<p style="margin:0 0 12px;font-size:16px;"><b>Nom :</b> {name}</p>
-<p style="margin:0 0 12px;font-size:16px;"><b>Email :</b> <a href="mailto:{email}" style="color:#EA4F26;">{email}</a></p>
-<p style="margin:0;font-size:16px;"><b>Total sur la liste :</b> {total} personne(s)</p>
-</td></tr>
-<tr><td style="background:#419958;padding:16px 32px;border-radius:0 0 8px 8px;text-align:center;">
-<span style="color:#ffffff;font-size:13px;">contact@chloeludmann.fr</span>
-</td></tr>
-</table></td></tr></table>
+<html lang="fr"><head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;color:#222;padding:24px">
+  <h2 style="color:#419958">Nouvelle inscription liste d&rsquo;attente</h2>
+  <table style="border-collapse:collapse;font-size:15px">
+    <tr><td style="padding:6px 16px 6px 0;color:#666">Nom complet</td><td><strong>{name}</strong></td></tr>
+    <tr><td style="padding:6px 16px 6px 0;color:#666">Email</td><td><a href="mailto:{email}">{email}</a></td></tr>
+    <tr><td style="padding:6px 16px 6px 0;color:#666">Total liste</td><td><strong>{total} personne(s)</strong></td></tr>
+  </table>
 </body></html>"""
-    msg.attach(MIMEText(html, 'html', 'utf-8'))
-    with smtplib.SMTP('smtp.gmail.com', 587) as s:
-        s.starttls()
-        s.login(SMTP_USER, SMTP_PASS)
-        s.sendmail(SMTP_USER, ADMIN_EMAIL, msg.as_string())
-    print(f'[notifier] Admin notifie : {name} <{email}> (total={total})')
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = f"Automations Chloe <{OVH_SMTP_USER}>"
+    msg["To"]      = ADMIN_EMAIL
+    msg.attach(MIMEText(html, "html", "utf-8"))
+    import smtplib as _smtplib
+    with _smtplib.SMTP_SSL(OVH_SMTP_HOST, OVH_SMTP_PORT) as smtp:
+        smtp.login(OVH_SMTP_USER, OVH_SMTP_PASS)
+        smtp.sendmail(OVH_SMTP_USER, [ADMIN_EMAIL], msg.as_string())
+    print(f"[notifier] Admin notifie : {name} <{email}> (total={total})")
 
-def notify_all(waitlist: list, event_name: str = "", start_time: str = "", end_time: str = "", booking_url: str = "") -> None:
+
+def notify_all(waitlist: list, event_name: str = "", start_time: str = "", end_time: str = "") -> None:
     for entry in waitlist:
         email = entry.get("email", "")
         name  = entry.get("name", "")
         if not email:
             continue
-        html = _html_notification(name, event_name, start_time, end_time, booking_url, email)
+        html = _html_notification(name, event_name, start_time, end_time)
         _send(email, "🎵 Un créneau vient de se libérer", html)
         print(f"[notifier] Notification envoyée à {name} <{email}>")

@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import imaplib
 import email
@@ -27,7 +27,6 @@ NOTION_EVENTS_DB = os.environ.get("NOTION_EVENTS_DATABASE_ID", "35eafa74cfc980d0
 _DIR          = os.path.dirname(os.path.abspath(__file__))
 GMAIL_TOKEN   = os.path.join(_DIR, "token.json")
 GMAIL_SCOPES  = ["https://www.googleapis.com/auth/gmail.readonly"]
-PROCESSED_EMAILS_FILE = os.path.join(_DIR, "processed_emails.json")
 
 IMAP_PORT = 993
 
@@ -114,31 +113,6 @@ def format_date_fr(date_str: str, heure_str: str = "") -> str:
         return date_str or ""
 
 
-# Deduplication
-
-def load_processed_ids() -> set:
-    if os.path.exists(PROCESSED_EMAILS_FILE):
-        with open(PROCESSED_EMAILS_FILE) as f:
-            return set(json.load(f))
-    return set()
-
-
-def save_processed_id(email_key: str, processed_ids: set) -> None:
-    processed_ids.add(email_key)
-    with open(PROCESSED_EMAILS_FILE, "w") as f:
-        json.dump(list(processed_ids), f)
-
-
-def get_email_key(em: dict) -> str:
-    mid = em.get("message_id", "")
-    if mid:
-        return mid
-    uid = em["uid"]
-    if isinstance(uid, bytes):
-        uid = uid.decode()
-    return f"{em['source']}:{em['boite']}:{uid}"
-
-
 # IMAP
 
 def decode_str(value):
@@ -223,14 +197,13 @@ def _fetch_imap_account(host: str, user: str, password: str, boite: str, days: i
             raw = msg_data[0][1]
             msg = email.message_from_bytes(raw)
             emails.append({
-                "uid":        uid,
-                "message_id": msg.get("Message-ID", "").strip(),
-                "subject":    decode_str(msg.get("Subject", "")),
-                "from":       decode_str(msg.get("From", "")),
-                "date":       msg.get("Date", ""),
-                "body":       extract_imap_body(msg),
-                "source":     "imap",
-                "boite":      boite,
+                "uid":     uid,
+                "subject": decode_str(msg.get("Subject", "")),
+                "from":    decode_str(msg.get("From", "")),
+                "date":    msg.get("Date", ""),
+                "body":    extract_imap_body(msg),
+                "source":  "imap",
+                "boite":   boite,
             })
     return emails
 
@@ -349,28 +322,26 @@ def fetch_gmail_emails(days: int = DAYS_BACK) -> list:
         full    = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
         headers = {h["name"]: h["value"] for h in full["payload"]["headers"]}
         emails.append({
-            "uid":        msg_id,
-            "message_id": f"gmail:{msg_id}",
-            "subject":    headers.get("Subject", ""),
-            "from":       headers.get("From", ""),
-            "date":       headers.get("Date", ""),
-            "body":       extract_gmail_body(full["payload"]),
-            "source":     "gmail",
-            "boite":      "bour.chloe0@gmail.com",
+            "uid":     msg_id,
+            "subject": headers.get("Subject", ""),
+            "from":    headers.get("From", ""),
+            "date":    headers.get("Date", ""),
+            "body":    extract_gmail_body(full["payload"]),
+            "source":  "gmail",
+            "boite":   "bour.chloe0@gmail.com",
         })
 
     for msg_id in candidate_ids:
         full    = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
         headers = {h["name"]: h["value"] for h in metadata[msg_id]["payload"]["headers"]}
         emails.append({
-            "uid":        msg_id,
-            "message_id": f"gmail:{msg_id}",
-            "subject":    headers.get("Subject", ""),
-            "from":       headers.get("From", ""),
-            "date":       headers.get("Date", ""),
-            "body":       extract_gmail_body(full["payload"]),
-            "source":     "gmail",
-            "boite":      "bour.chloe0@gmail.com",
+            "uid":     msg_id,
+            "subject": headers.get("Subject", ""),
+            "from":    headers.get("From", ""),
+            "date":    headers.get("Date", ""),
+            "body":    extract_gmail_body(full["payload"]),
+            "source":  "gmail",
+            "boite":   "bour.chloe0@gmail.com",
         })
 
     return emails
@@ -559,12 +530,7 @@ def upsert_event(notion: NotionClient, events_cache: dict,
 
 # Processing
 
-def process_email(notion: NotionClient, em: dict, events_cache: dict, processed_ids: set) -> None:
-    email_key = get_email_key(em)
-    if email_key in processed_ids:
-        print("  -> Deja traite, ignore")
-        return
-
+def process_email(notion: NotionClient, em: dict, events_cache: dict) -> None:
     sender_email = extract_email_from_header(em["from"])
     date_mail    = parse_date_header(em["date"])
 
@@ -583,13 +549,11 @@ def process_email(notion: NotionClient, em: dict, events_cache: dict, processed_
 
         _, created = upsert_event(notion, events_cache, titre,
                                   email_eleve, date_mail, info_calendly, "", em.get("boite", ""))
-        save_processed_id(email_key, processed_ids)
         action = "Cree" if created else "Mis a jour"
         print(f"  OK {action} : {titre}")
 
     else:
         result = classify_email(em)
-        save_processed_id(email_key, processed_ids)
         if not result.get("is_client"):
             print("  -> Ignore")
             return
@@ -616,10 +580,6 @@ def main():
     events_cache = load_all_events_bulk(notion)
     cleanup_event_duplicates(notion, events_cache)
 
-    print("Chargement des emails deja traites...")
-    processed_ids = load_processed_ids()
-    print(f"  {len(processed_ids)} email(s) en cache.")
-
     print(f"Connexion IMAP (fenetre : {DAYS_BACK} jours)...")
     imap_emails = fetch_imap_emails()
     print(f"{len(imap_emails)} email(s) IMAP.\n")
@@ -638,7 +598,7 @@ def main():
     for em in all_emails:
         print(f"[{em['source'].upper()}] {em['subject'][:60]}")
         try:
-            process_email(notion, em, events_cache, processed_ids)
+            process_email(notion, em, events_cache)
         except (json.JSONDecodeError, ValueError) as e:
             print(f"  Erreur : {e}")
 
