@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Tableau de bord — Mon Agent IA{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Tableau de bord</h1>
+  </div>
+</div>
+
+{% set agent_order = ["Suivi Élèves", "Factures", "Liste d'attente"] %}
+{% for agent_name in agent_order %}
+  {% set agent_items = automations | selectattr("agent", "equalto", agent_name) | list %}
+  {% if agent_items %}
+  <section class="agent-section">
+    <h2 class="agent-title">{{ agent_name }}</h2>
+    <div class="automations-grid">
+      {% for a in agent_items %}
+      <div class="automation-card">
+        <div class="card-top">
+          <span class="card-icon">{{ a.icon }}</span>
+          <div class="card-title-block">
+            <span class="card-name">{{ a.name }}</span>
+            <span class="card-script">{{ a.script }}</span>
+          </div>
+          <span class="card-badge card-badge--{{ a.last.status }}">{{ a.last.label }}</span>
+        </div>
+        <p class="card-description">{{ a.description }}</p>
+        <div class="card-footer">
+          <span class="card-frequency">🔄 {{ a.frequency }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if agent_name == "Suivi Élèves" %}
+    <div class="agent-action">
+      <a href="{{ url_for('eleves') }}" class="btn-primary btn-block">Ouvrir la base Élèves</a>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+{% endfor %}
+{% endblock %}

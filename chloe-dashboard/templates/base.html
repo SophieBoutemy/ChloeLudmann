@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Dashboard — Chloé Ludmann{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  {% if session.get('logged_in') and request.endpoint != 'login' %}
+  <header>
+    <div class="header-inner">
+
+      <div class="header-brand">
+        <span class="header-name">La Petite Fabrique Digitale</span>
+        <span class="header-tagline">Des outils digitaux qui travaillent pour vous</span>
+      </div>
+
+      <nav class="header-nav">
+        <a href="{{ url_for('index') }}"
+           class="header-nav-link {% if request.endpoint == 'index' %}active{% endif %}">Tableau de bord</a>
+        <a href="{{ url_for('eleves') }}"
+           class="header-nav-link {% if request.endpoint in ('eleves', 'eleve_detail', 'eleves_export', 'eleve_relancer', 'eleve_update_property', 'eleve_save_notes') %}active{% endif %}">Base élèves</a>
+        <a href="{{ url_for('factures') }}"
+           class="header-nav-link {% if request.endpoint in ('factures', 'facture_detail', 'factures_export', 'factures_refresh', 'facture_update_comptable') %}active{% endif %}">Factures</a>
+        <a href="{{ url_for('liste_attente') }}"
+           class="header-nav-link {% if request.endpoint == 'liste_attente' %}active{% endif %}">Liste d'attente</a>
+      </nav>
+
+      <div class="header-right">
+        <a href="{{ url_for('logout') }}" class="nav-logout">Déconnexion</a>
+      </div>
+
+    </div>
+  </header>
+  {% endif %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

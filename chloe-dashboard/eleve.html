@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if eleve %}{{ eleve.nom or eleve.email }}{% else %}Élève{% endif %} — Mon Agent IA{% endblock %}
+
+{% block extra_head %}
+<style>
+a.back { font-size:.875rem; color:var(--muted); text-decoration:none; display:inline-block; margin-bottom:1.5rem; }
+a.back:hover { color:var(--green); }
+
+.header-row {
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem;
+}
+.header-row h1 { margin:0; flex:1; }
+.header-actions { display:flex; gap:.55rem; flex-wrap:wrap; }
+
+.detail-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;
+}
+@media (max-width:600px) { .detail-grid { grid-template-columns:1fr; } }
+
+.detail-card {
+  background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:1.1rem 1.3rem;
+}
+.detail-card.full { grid-column:1 / -1; }
+.detail-card h3 {
+  font-size:.7rem; font-weight:600; color:var(--muted);
+  letter-spacing:.08em; text-transform:uppercase; margin-bottom:.45rem;
+}
+.detail-card .value {
+  font-size:.9rem; color:var(--text); line-height:1.55;
+  white-space:pre-wrap; word-break:break-word;
+}
+.detail-card .value.empty { color:var(--muted); font-style:italic; }
+
+.badge {
+  display:inline-block; padding:.18rem .6rem; border-radius:20px; font-size:.8rem; font-weight:500;
+}
+.badge-signe   { background:#dcfce7; color:#166534; }
+.badge-attente { background:#fff0d9; color:#9a4500; }
+.badge-relance { background:#e0f2fe; color:#0369a1; }
+
+.badge-type {
+  display:inline-block; padding:.13rem .5rem; border-radius:20px;
+  font-size:.78rem; background:#f0f4ee; color:var(--green); margin-right:.3rem;
+}
+
+/* Notes section */
+.notes-section {
+  background:#fff; border-radius:var(--radius); box-shadow:var(--shadow);
+  padding:1.3rem; margin-bottom:1.5rem;
+}
+.notes-section h2 {
+  font-size:.75rem; font-weight:600; color:var(--muted);
+  letter-spacing:.08em; text-transform:uppercase; margin-bottom:.65rem;
+}
+.notes-textarea {
+  width:100%; min-height:160px; padding:.75rem 1rem;
+  border:1.5px solid var(--border); border-radius:8px;
+  font-size:.9rem; font-family:inherit; line-height:1.6;
+  color:var(--text); background:#fdfcfb; resize:vertical;
+  outline:none; box-sizing:border-box;
+  transition:border-color .15s;
+}
+.notes-textarea:focus { border-color:var(--green); }
+.notes-save-row { display:flex; align-items:center; gap:.75rem; margin-top:.65rem; }
+.notes-status { font-size:.8rem; color:var(--muted); }
+.notes-status.ok   { color:#16a34a; }
+.notes-status.err  { color:#b91c1c; }
+
+/* Bottom action bar */
+.action-bar {
+  display:flex; gap:.75rem; flex-wrap:wrap; align-items:center;
+  padding:1rem 0; border-top:1px solid var(--border); margin-top:.5rem;
+}
+
+.btn-danger {
+  background:#fef2f2; color:#b91c1c; border:1.5px solid #fecaca;
+  padding:.55rem 1.2rem; border-radius:8px; font-size:.875rem;
+  font-weight:500; font-family:inherit; cursor:pointer; transition:background .15s;
+}
+.btn-danger:hover { background:#fee2e2; }
+
+.btn-notion {
+  background:transparent; color:var(--muted); border:1.5px solid var(--border);
+  padding:.55rem 1.2rem; border-radius:8px; font-size:.875rem;
+  font-weight:500; font-family:inherit; cursor:pointer; text-decoration:none;
+  display:inline-block; transition:background .15s;
+}
+.btn-notion:hover { background:#f5f5f5; color:var(--text); }
+
+.alert-error {
+  background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;
+  border-radius:6px; padding:.75rem 1rem; margin-bottom:1.25rem; font-size:.875rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('eleves') }}" class="back">← Retour à la liste</a>
+
+{% if error %}
+<div class="alert-error">{{ error }}</div>
+{% elif eleve %}
+
+<div class="header-row">
+  <h1>{{ eleve.nom or eleve.email or 'Élève sans nom' }}</h1>
+  <div class="header-actions">
+    {% if eleve.statut_contrat == 'En attente' %}
+    <button id="btn-relancer" class="btn-primary" style="padding:.55rem 1.2rem;" onclick="relancer()">Relancer le contrat</button>
+    {% endif %}
+    {% if eleve.notion_url %}
+    <a href="{{ eleve.notion_url }}" target="_blank" class="btn-notion">Ouvrir dans Notion ↗</a>
+    {% endif %}
+    <button class="btn-danger" onclick="supprimerEleve()">Supprimer cet élève</button>
+  </div>
+</div>
+
+{# ── Read-only header info ── #}
+<div class="detail-grid">
+  <div class="detail-card">
+    <h3>Email</h3>
+    <div class="value {% if not eleve.email %}empty{% endif %}">{{ eleve.email or 'Non renseigné' }}</div>
+  </div>
+  <div class="detail-card">
+    <h3>Nom complet</h3>
+    <div class="value {% if not eleve.nom %}empty{% endif %}">{{ eleve.nom or 'Non renseigné' }}</div>
+  </div>
+  <div class="detail-card">
+    <h3>Type d'élève</h3>
+    <div class="value">
+      {% if eleve.type_eleve %}
+        {% for t in eleve.type_eleve.split(',') %}
+          <span class="badge-type">{{ t.strip() }}</span>
+        {% endfor %}
+      {% else %}<span class="empty">Non renseigné</span>{% endif %}
+    </div>
+  </div>
+  <div class="detail-card">
+    <h3>Boîte mail</h3>
+    <div class="value {% if not eleve.boite_mail %}empty{% endif %}">{{ eleve.boite_mail or 'Non renseigné' }}</div>
+  </div>
+  <div class="detail-card">
+    <h3>Statut contrat envoyé</h3>
+    <div class="value">
+      {% if eleve.statut_contrat == 'Signé' %}
+        <span class="badge badge-signe">Signé</span>
+      {% elif eleve.statut_contrat == 'Relancé' %}
+        <span class="badge badge-relance">Relancé</span>
+      {% elif eleve.statut_contrat == 'En attente' %}
+        <span class="badge badge-attente">En attente</span>
+      {% elif eleve.statut_contrat %}
+        {{ eleve.statut_contrat }}
+      {% else %}<span class="empty">Non renseigné</span>{% endif %}
+    </div>
+  </div>
+  <div class="detail-card">
+    <h3>Date du mail</h3>
+    <div class="value {% if not eleve.date_mail %}empty{% endif %}">{{ eleve.date_mail or '—' }}</div>
+  </div>
+  <div class="detail-card">
+    <h3>Date newsletter envoyée</h3>
+    <div class="value {% if not eleve.date_newsletter %}empty{% endif %}">{{ eleve.date_newsletter or '—' }}</div>
+  </div>
+  <div class="detail-card">
+    <h3>Date contrat envoyé</h3>
+    <div class="value {% if not eleve.date_contrat %}empty{% endif %}">{{ eleve.date_contrat or '—' }}</div>
+  </div>
+  <div class="detail-card">
+    <h3>Date de relance</h3>
+    <div class="value {% if not eleve.date_relance %}empty{% endif %}">{{ eleve.date_relance or '—' }}</div>
+  </div>
+  <div class="detail-card">
+    <h3>Rattrapage</h3>
+    <div class="value {% if not eleve.rattrapage %}empty{% endif %}">{{ eleve.rattrapage or '—' }}</div>
+  </div>
+  <div class="detail-card full">
+    <h3>Infos</h3>
+    <div class="value {% if not eleve.infos %}empty{% endif %}">{{ eleve.infos or '—' }}</div>
+  </div>
+  <div class="detail-card full">
+    <h3>Infos Calendly</h3>
+    <div class="value {% if not eleve.infos_calendly %}empty{% endif %}">{{ eleve.infos_calendly or '—' }}</div>
+  </div>
+  <div class="detail-card full">
+    <h3>Résumé du mail <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem;">(lecture seule, rempli automatiquement)</span></h3>
+    <div class="value {% if not eleve.resume_mail %}empty{% endif %}">{{ eleve.resume_mail or 'Aucun résumé disponible.' }}</div>
+  </div>
+</div>
+
+{# ── Notes (page body) ── #}
+<div class="notes-section">
+  <h2>Notes libres</h2>
+  <textarea class="notes-textarea" id="notes-textarea"
+            placeholder="Notes libres sur cet élève…">{{ eleve.notes }}</textarea>
+  <div class="notes-save-row">
+    <button class="btn-primary" style="padding:.45rem 1.1rem;font-size:.875rem;" onclick="saveNotes()">Enregistrer les notes</button>
+    <span class="notes-status" id="notes-status"></span>
+  </div>
+</div>
+
+{# ── Action bar ── #}
+<div class="action-bar">
+  {% if eleve.statut_contrat == 'En attente' %}
+  <button id="btn-relancer2" class="btn-primary" style="padding:.55rem 1.2rem;" onclick="relancer()">Relancer le contrat</button>
+  {% endif %}
+  {% if eleve.notion_url %}
+  <a href="{{ eleve.notion_url }}" target="_blank" class="btn-notion">Ouvrir dans Notion ↗</a>
+  {% endif %}
+  <button class="btn-danger" onclick="supprimerEleve()">Supprimer cet élève</button>
+</div>
+
+<script>
+const PAGE_ID     = "{{ eleve.id }}";
+const ELEVES_BASE = "{{ url_for('eleves') }}";
+
+/* ── Notes ── */
+function saveNotes() {
+  const content = document.getElementById('notes-textarea').value;
+  const status  = document.getElementById('notes-status');
+  status.textContent = 'Enregistrement…';
+  status.className   = 'notes-status';
+  fetch(ELEVES_BASE + '/' + PAGE_ID + '/notes', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({content}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      status.textContent = 'Enregistré ✓';
+      status.className   = 'notes-status ok';
+      setTimeout(() => { status.textContent = ''; }, 2500);
+    } else {
+      status.textContent = 'Erreur : ' + data.error;
+      status.className   = 'notes-status err';
+    }
+  })
+  .catch(() => {
+    status.textContent = 'Erreur réseau.';
+    status.className   = 'notes-status err';
+  });
+}
+
+/* Auto-save on Ctrl+S / Cmd+S */
+document.getElementById('notes-textarea').addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    saveNotes();
+  }
+});
+
+/* ── Relancer ── */
+function relancer() {
+  if (!confirm('Envoyer une relance pour cet élève ?')) return;
+  const btns = document.querySelectorAll('#btn-relancer, #btn-relancer2');
+  btns.forEach(b => { b.disabled = true; b.textContent = 'Envoi…'; });
+  fetch(ELEVES_BASE + '/' + PAGE_ID + '/relancer', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) { alert(data.message); window.location.reload(); }
+      else {
+        btns.forEach(b => { b.disabled = false; b.textContent = 'Relancer le contrat'; });
+        alert('Erreur : ' + data.error);
+      }
+    })
+    .catch(() => {
+      btns.forEach(b => { b.disabled = false; b.textContent = 'Relancer le contrat'; });
+      alert('Erreur réseau.');
+    });
+}
+
+/* ── Supprimer ── */
+function supprimerEleve() {
+  if (!confirm('Supprimer définitivement cet élève de la base Notion ?')) return;
+  fetch(ELEVES_BASE + '/' + PAGE_ID, {method: 'DELETE'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        alert('Élève supprimé.');
+        window.location.href = ELEVES_BASE;
+      } else {
+        alert('Erreur : ' + data.error);
+      }
+    })
+    .catch(() => alert('Erreur réseau.'));
+}
+</script>
+
+{% endif %}
+{% endblock %}

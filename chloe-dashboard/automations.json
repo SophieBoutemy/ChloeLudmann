@@ -1,0 +1,95 @@
+[
+  {
+    "id": "imap",
+    "icon": "📧",
+    "name": "Surveillance des boîtes mail",
+    "description": "Lecture des boîtes contact@chloeludmann.fr, contact@whisper-in-the-rennes.fr et bour.chloe0@gmail.com — détection des annulations, réservations Calendly, résumé des emails clients, retards, rattrapages, demandes d'inscription",
+    "trigger": "cron",
+    "frequency": "1× par jour à 19h30",
+    "script": "imap_to_notion_chloe.py",
+    "log": "/home/ubuntu/automations/logs/imap_to_notion_chloe.log",
+    "stale_after_hours": 25,
+    "agent": "Suivi Élèves"
+  },
+  {
+    "id": "docage",
+    "icon": "📄",
+    "name": "Synchronisation Docage",
+    "description": "Récupération des statuts de contrats et mise à jour Notion",
+    "trigger": "cron",
+    "frequency": "lun, mer, ven à 8h",
+    "script": "docage_to_notion.py",
+    "log": "/home/ubuntu/automations/logs/docage_to_notion.log",
+    "stale_after_hours": 72,
+    "agent": "Suivi Élèves"
+  },
+  {
+    "id": "daily_summary",
+    "icon": "📊",
+    "name": "Résumé quotidien",
+    "description": "Envoi d'un résumé des 24h par email à contact@chloeludmann.fr",
+    "trigger": "cron",
+    "frequency": "tous les jours à 20h",
+    "script": "daily_summary.py",
+    "log": "/home/ubuntu/automations/logs/daily_summary.log",
+    "stale_after_hours": 25,
+    "agent": "Suivi Élèves"
+  },
+  {
+    "id": "weekly_backup",
+    "icon": "💾",
+    "name": "Backup Notion",
+    "description": "Sauvegarde hebdomadaire de la base Élèves Notion en JSON",
+    "trigger": "cron",
+    "frequency": "dimanches à 20h",
+    "script": "weekly_backup.py",
+    "log": "/home/ubuntu/automations/logs/weekly_backup.log",
+    "stale_after_hours": 192,
+    "agent": "Suivi Élèves"
+  },
+  {
+    "id": "export_excel",
+    "icon": "📥",
+    "name": "Export Excel",
+    "description": "Export de la base Élèves Notion au format Excel",
+    "trigger": "systemd",
+    "service": "export-eleves.service",
+    "frequency": "Service permanent (port 5003)",
+    "script": "export_excel/app.py",
+    "agent": "Suivi Élèves"
+  },
+  {
+    "id": "factures_cron",
+    "icon": "🧾",
+    "name": "Scan des factures",
+    "description": "Détection des factures dans les boîtes mail IMAP, upload sur Drive et création des entrées Notion",
+    "trigger": "cron",
+    "frequency": "lundis à 8h",
+    "script": "factures/factures.py",
+    "log": "/home/ubuntu/automations/logs/factures.log",
+    "stale_after_hours": 192,
+    "agent": "Factures"
+  },
+  {
+    "id": "factures_app",
+    "icon": "🔍",
+    "name": "Interface scan factures",
+    "description": "Interface de scan manuel des factures IMAP",
+    "trigger": "systemd",
+    "service": "factures-app.service",
+    "frequency": "Service permanent (port 5004)",
+    "script": "factures/app.py",
+    "agent": "Factures"
+  },
+  {
+    "id": "liste_attente",
+    "icon": "📋",
+    "name": "Webhook Tally-Calendly",
+    "description": "Webhook Tally et Calendly — gestion de la liste d'attente et notifications automatiques",
+    "trigger": "systemd",
+    "service": "liste-attente.service",
+    "frequency": "Service permanent (port 5002)",
+    "script": "liste_attente/app.py",
+    "agent": "Liste d'attente"
+  }
+]

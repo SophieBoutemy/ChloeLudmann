@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if facture %}{{ facture.nom }}{% else %}Facture{% endif %} — Mon Agent IA{% endblock %}
+
+{% block extra_head %}
+<style>
+.page-top {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:1rem; flex-wrap:wrap; margin-bottom:1.75rem;
+}
+.page-top h1 { font-size:1.4rem; font-weight:600; color:var(--green); margin:0; }
+.page-top-actions { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+
+.btn-action {
+  padding:.38rem .85rem; border-radius:7px; font-size:.8125rem;
+  font-weight:500; font-family:inherit; cursor:pointer;
+  border:none; transition:background .15s; white-space:nowrap;
+}
+.btn-action-outline {
+  background:transparent; color:var(--green);
+  border:1.5px solid var(--green); text-decoration:none; display:inline-block;
+}
+.btn-action-outline:hover { background:#f0f4ee; }
+
+.card {
+  background:#fff; border-radius:8px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08); margin-bottom:1.25rem;
+}
+.card-header { padding:.85rem 1.4rem; border-bottom:1px solid var(--border); }
+.card-header h2 {
+  font-size:.7rem; font-weight:700; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.09em; margin:0;
+}
+.card-body { padding:20px; }
+
+.info-list { display:flex; flex-direction:column; }
+.info-item { padding:.75rem 0; border-bottom:1px solid #F0F0F0; }
+.info-item:first-child { padding-top:0; }
+.info-item:last-child  { padding-bottom:0; border-bottom:none; }
+.info-label {
+  font-size:.72rem; font-weight:600; color:#C66A00;
+  text-transform:uppercase; letter-spacing:.07em; margin-bottom:.2rem;
+}
+.info-value { font-size:.9rem; color:#262525; line-height:1.55; word-break:break-all; }
+.info-value.empty { color:#cac8c5; }
+
+.btn-drive {
+  display:inline-flex; align-items:center; gap:.3rem;
+  padding:.35rem .75rem; font-size:.8125rem; font-weight:500; font-family:inherit;
+  background:#f0f4ee; color:var(--green); border:1px solid #c5d3b0;
+  border-radius:6px; cursor:pointer; text-decoration:none; transition:background .15s;
+}
+.btn-drive:hover { background:#dce8d0; }
+
+.alert-error {
+  background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;
+  border-radius:6px; padding:.75rem 1rem; margin-bottom:1.25rem; font-size:.875rem;
+}
+
+.badge-oui { display:inline-block; padding:.18rem .6rem; border-radius:20px; font-size:.8rem; font-weight:500; background:#dcfce7; color:#166534; }
+.badge-non { display:inline-block; padding:.18rem .6rem; border-radius:20px; font-size:.8rem; font-weight:500; background:#fef2f2; color:#b91c1c; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if error %}
+<div class="alert-error">{{ error }}</div>
+{% elif facture %}
+
+<div class="page-top">
+  <h1>{{ facture.nom or 'Facture sans nom' }}</h1>
+  <div class="page-top-actions">
+    {% if facture.lien_drive %}
+    <a href="{{ facture.lien_drive }}" target="_blank" class="btn-action btn-action-outline">↗ Ouvrir dans Drive</a>
+    {% endif %}
+    {% if facture.notion_url %}
+    <a href="{{ facture.notion_url }}" target="_blank" class="btn-action btn-action-outline">Ouvrir dans Notion ↗</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h2>Informations</h2></div>
+  <div class="card-body">
+    <div class="info-list">
+
+      <div class="info-item">
+        <div class="info-label">Nom de la facture</div>
+        <div class="info-value {% if not facture.nom %}empty{% endif %}">{{ facture.nom or '—' }}</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Date de réception</div>
+        <div class="info-value {% if not facture.date %}empty{% endif %}">{{ facture.date or '—' }}</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Expéditeur</div>
+        <div class="info-value {% if not facture.expediteur %}empty{% endif %}">{{ facture.expediteur or '—' }}</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Envoyée à la comptable</div>
+        <div class="info-value">
+          {% if facture.comptable %}
+            <span class="badge-oui">Oui</span>
+          {% else %}
+            <span class="badge-non">Non</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Lien Drive</div>
+        <div class="info-value">
+          {% if facture.lien_drive %}
+          <a href="{{ facture.lien_drive }}" target="_blank" class="btn-drive">↗ Ouvrir le fichier</a>
+          {% else %}<span class="empty">—</span>{% endif %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

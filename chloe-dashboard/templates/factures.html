@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+
+{% block title %}Factures — Mon Agent IA{% endblock %}
+
+{% block extra_head %}
+<style>
+.count-badge {
+  display:inline-block; background:var(--green); color:#fff;
+  font-size:.7rem; font-weight:600; padding:.15rem .55rem;
+  border-radius:20px; margin-left:.4rem; vertical-align:middle;
+}
+
+.filters-wrap {
+  background:#fff; border-radius:8px;
+  padding:1rem 1.1rem; margin-bottom:1.1rem;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+.filters-controls {
+  display:flex; flex-wrap:wrap; gap:.55rem; align-items:center;
+}
+.filter-select, .filter-input {
+  padding:.35rem .7rem; border:1.5px solid var(--border); border-radius:6px;
+  font-size:.8125rem; font-family:inherit; color:var(--text);
+  background:#fff; outline:none; height:32px;
+}
+.filter-select:focus, .filter-input:focus { border-color:var(--green); }
+.filter-input { min-width:200px; }
+.filters-spacer { flex:1; }
+.filters-actions { display:flex; gap:.45rem; margin-left:auto; }
+.filters-row2 { display:flex; gap:.45rem; margin-top:.65rem; }
+
+.btn-sm {
+  display:inline-flex; align-items:center; padding:.3rem .75rem;
+  border-radius:6px; border:none; font-size:.8rem; font-weight:500;
+  font-family:inherit; cursor:pointer; text-decoration:none;
+  transition:background .15s; white-space:nowrap; height:32px;
+}
+.btn-sm-outline { background:transparent; color:var(--green); border:1.5px solid var(--green); }
+.btn-sm-outline:hover { background:#f0f4ee; }
+.btn-sm-orange { background:var(--orange); color:#fff; }
+.btn-sm-orange:hover { background:#c46c0a; }
+.btn-sm-green  { background:var(--green); color:#fff; }
+.btn-sm-green:hover  { background:#2a3a1e; }
+
+.table-wrap {
+  overflow-x:auto; border-radius:8px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08); background:#fff;
+}
+table { width:100%; border-collapse:collapse; font-size:.8125rem; white-space:nowrap; }
+thead th {
+  background:var(--green); color:#fff; font-weight:500;
+  padding:.6rem .9rem; text-align:left; position:sticky; top:0; z-index:1;
+}
+tbody tr { border-bottom:1px solid #f0ece8; transition:background .1s; }
+tbody tr:hover { background:#faf8f6; }
+tbody tr:last-child { border-bottom:none; }
+td { padding:.5rem .9rem; color:var(--text); }
+td.td-nom  { font-weight:500; max-width:260px; overflow:hidden; text-overflow:ellipsis; }
+td.td-date { color:var(--muted); font-size:.775rem; }
+.muted { color:var(--muted); }
+
+/* Checkbox inline */
+.check-cell { text-align:center; }
+.check-toggle {
+  width:18px; height:18px; cursor:pointer; accent-color:var(--green);
+  border-radius:4px;
+}
+.check-toggle:disabled { opacity:.5; cursor:not-allowed; }
+
+/* Drive button */
+.btn-drive {
+  display:inline-flex; align-items:center; gap:.3rem;
+  padding:.2rem .55rem; font-size:.75rem; font-weight:500; font-family:inherit;
+  background:#f0f4ee; color:var(--green); border:1px solid #c5d3b0;
+  border-radius:5px; cursor:pointer; text-decoration:none; transition:background .15s;
+}
+.btn-drive:hover { background:#dce8d0; }
+
+.alert-error {
+  background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;
+  border-radius:6px; padding:.75rem 1rem; margin-bottom:1.1rem; font-size:.875rem;
+}
+.empty-state { text-align:center; padding:3rem 1rem; color:var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Factures <span class="count-badge" id="count">{{ factures|length }}</span></h1>
+  </div>
+</div>
+
+{% if error %}
+<div class="alert-error">Erreur Notion : {{ error }}</div>
+{% endif %}
+
+<div class="filters-wrap">
+  <div class="filters-controls">
+    <input class="filter-input" id="f-search" type="text" placeholder="Rechercher…" oninput="applyFilters()">
+
+    <select class="filter-select" id="f-expediteur" onchange="applyFilters()">
+      <option value="">Expéditeur</option>
+      {% set expediteurs = factures|map(attribute='expediteur')|select|unique|list|sort %}
+      {% for e in expediteurs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}
+    </select>
+
+    <select class="filter-select" id="f-date" onchange="applyFilters()">
+      <option value="">Toutes les dates</option>
+      {% set mois = [] %}
+      {% for f in factures %}{% if f.date and f.date[:7] not in mois %}{% set _ = mois.append(f.date[:7]) %}{% endif %}{% endfor %}
+      {% for m in mois|sort(reverse=true) %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+    </select>
+
+    <select class="filter-select" id="f-comptable" onchange="applyFilters()">
+      <option value="">Envoyée à la comptable</option>
+      <option value="oui">Envoyée</option>
+      <option value="non">Non envoyée</option>
+    </select>
+
+    <div class="filters-spacer"></div>
+    <div class="filters-actions">
+      <button class="btn-sm btn-sm-outline" onclick="resetFilters()">Réinitialiser</button>
+      <button class="btn-sm btn-sm-orange" onclick="exportExcel()">Export Excel</button>
+    </div>
+  </div>
+  <div class="filters-row2">
+    <button class="btn-sm btn-sm-green" id="btn-refresh" onclick="refreshFactures()">Rafraîchir</button>
+    <button class="btn-sm btn-sm-outline" onclick="openDrive()">📁 Accéder au dossier Drive</button>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Nom de la facture</th>
+        <th>Date de réception</th>
+        <th>Expéditeur</th>
+        <th style="text-align:center;">Envoyée à la comptable</th>
+        <th>Lien Drive</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      {% for f in factures %}
+      <tr class="facture-row"
+          data-expediteur="{{ f.expediteur }}"
+          data-date="{{ f.date[:7] if f.date else '' }}"
+          data-comptable="{{ 'oui' if f.comptable else 'non' }}"
+          data-search="{{ (f.nom ~ ' ' ~ f.expediteur)|lower }}">
+        <td class="td-nom" title="{{ f.nom }}">{{ f.nom or '—' }}</td>
+        <td class="td-date">{{ f.date or '—' }}</td>
+        <td>{{ f.expediteur or '—' }}</td>
+        <td class="check-cell">
+          <input type="checkbox" class="check-toggle"
+                 {% if f.comptable %}checked{% endif %}
+                 data-id="{{ f.id }}"
+                 onclick="event.stopPropagation()"
+                 onchange="toggleComptable(this, '{{ f.id }}')">
+        </td>
+        <td>
+          {% if f.lien_drive %}
+          <a href="{{ f.lien_drive }}" target="_blank" class="btn-drive"
+             onclick="event.stopPropagation()">↗ Ouvrir</a>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty-state">Aucune facture trouvée.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+const FACTURES_BASE   = "{{ url_for('factures') }}";
+const FACTURES_EXPORT = "{{ url_for('factures_export') }}";
+const FACTURES_REFRESH= "{{ url_for('factures_refresh') }}";
+const DRIVE_URL       = "{{ drive_url }}";
+
+function openDrive() {
+  if (!DRIVE_URL) {
+    alert("URL du dossier Drive non configurée.\nAjouter DRIVE_FACTURES_URL dans le .env.");
+    return;
+  }
+  window.open(DRIVE_URL, '_blank');
+}
+
+function applyFilters() {
+  const search    = document.getElementById('f-search').value.toLowerCase();
+  const expediteur= document.getElementById('f-expediteur').value;
+  const date      = document.getElementById('f-date').value;
+  const comptable = document.getElementById('f-comptable').value;
+  let visible = 0;
+  document.querySelectorAll('.facture-row').forEach(row => {
+    const d = row.dataset;
+    const ok =
+      (!search     || d.search.includes(search))           &&
+      (!expediteur || d.expediteur === expediteur)         &&
+      (!date       || d.date === date)                     &&
+      (!comptable  || d.comptable === comptable);
+    row.style.display = ok ? '' : 'none';
+    if (ok) visible++;
+  });
+  document.getElementById('count').textContent = visible;
+}
+
+function resetFilters() {
+  ['f-expediteur','f-date','f-comptable'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-search').value = '';
+  applyFilters();
+}
+
+
+function exportExcel() {
+  const params = new URLSearchParams();
+  const exp = document.getElementById('f-expediteur').value;
+  const cpt = document.getElementById('f-comptable').value;
+  if (exp) params.set('expediteur', exp);
+  if (cpt) params.set('comptable', cpt);
+  window.location.href = FACTURES_EXPORT + '?' + params.toString();
+}
+
+function refreshFactures() {
+  const btn = document.getElementById('btn-refresh');
+  btn.disabled = true; btn.textContent = 'Récupération…';
+  fetch(FACTURES_REFRESH, {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) { window.location.reload(); }
+      else { btn.disabled = false; btn.textContent = 'Rafraîchir'; alert('Erreur : ' + data.error); }
+    })
+    .catch(() => { btn.disabled = false; btn.textContent = 'Rafraîchir'; alert('Erreur réseau.'); });
+}
+
+function toggleComptable(el, id) {
+  el.disabled = true;
+  fetch(FACTURES_BASE + '/' + id + '/comptable', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({checked: el.checked}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    el.disabled = false;
+    if (!data.ok) { el.checked = !el.checked; alert('Erreur : ' + data.error); }
+    else {
+      const row = el.closest('tr');
+      row.dataset.comptable = el.checked ? 'oui' : 'non';
+    }
+  })
+  .catch(() => { el.disabled = false; el.checked = !el.checked; alert('Erreur réseau.'); });
+}
+</script>
+{% endblock %}
