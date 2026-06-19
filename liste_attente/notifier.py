@@ -10,9 +10,9 @@ load_dotenv(os.path.expanduser("~/automations/.env"))
 
 SMTP_HOST    = "smtp.gmail.com"
 SMTP_PORT    = 587
-SMTP_USER    = "automationschloe@gmail.com"
+SMTP_USER    = "boutemy.automatisation@gmail.com"
 SMTP_PASS    = os.environ.get("GMAIL_AUTOMATION_PASSWORD", "")
-MAIL_FROM    = "Chloé Ludmann <automationschloe@gmail.com>"
+MAIL_FROM    = "Chloé Ludmann <boutemy.automatisation@gmail.com>"
 CALENDLY_URL = os.environ.get("CALENDLY_URL", "")
 
 ADMIN_EMAIL   = "contact@chloeludmann.fr"
@@ -221,5 +221,8 @@ def notify_all(waitlist: list, event_name: str = "", start_time: str = "", end_t
         if not email:
             continue
         html = _html_notification(name, event_name, start_time, end_time, booking_url, email)
-        _send(email, "🎵 Un créneau vient de se libérer", html)
-        print(f"[notifier] Notification envoyée à {name} <{email}>")
+        try:
+            _send(email, "🎵 Un créneau vient de se libérer", html)
+            print(f"[notifier] Notification envoyée à {name} <{email}>")
+        except Exception as e:
+            print(f"[notifier] Erreur envoi à {name} <{email}> : {e}")

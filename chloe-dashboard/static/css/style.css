@@ -33,9 +33,10 @@ html, body {
 
 /* ── Header ── */
 header {
-  background: var(--green);
+  background: #F6F1E7;
+  border-bottom: 1.5px solid #E3DBCC;
   padding: 0 2rem;
-  height: 64px;
+  height: 72px;
   display: flex;
   align-items: center;
 }
@@ -48,21 +49,34 @@ header {
   gap: 1rem;
 }
 
-.header-brand { display: flex; flex-direction: column; gap: 1px; }
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  flex-shrink: 0;
+}
+
+.header-compass { flex-shrink: 0; }
+
+.header-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
 
 .header-name {
-  font-family: 'Amarante', serif;
-  font-size: 1.45rem;
-  font-weight: 400;
-  color: #fff;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2F4A3C;
   line-height: 1.1;
-  letter-spacing: .01em;
 }
 
 .header-tagline {
-  font-size: 0.78rem;
-  color: rgba(255,255,255,.62);
-  font-weight: 400;
+  font-size: 0.72rem;
+  color: #8A9A7E;
+  font-family: 'Karla', system-ui, sans-serif;
+  font-weight: 500;
 }
 
 .header-nav {
@@ -78,27 +92,29 @@ header {
   padding: .3rem .75rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: rgba(249,246,243,.82);
+  color: #2F4A3C;
+  font-family: 'Karla', system-ui, sans-serif;
   text-decoration: none;
   border-radius: 5px;
   transition: color .15s, background .15s;
   cursor: pointer;
   white-space: nowrap;
 }
-.header-nav-link:hover { color: #fff; background: rgba(255,255,255,.1); }
-.header-nav-link.active { color: #DD7C0C; }
-.header-nav-disabled { color: rgba(249,246,243,.38); cursor: default; }
-.header-nav-disabled:hover { color: rgba(249,246,243,.38); background: transparent; }
+.header-nav-link:hover { color: #2F4A3C; background: rgba(47,74,60,.08); }
+.header-nav-link.active { color: #D97A3D; font-weight: 600; }
+.header-nav-disabled { color: rgba(47,74,60,.30); cursor: default; }
+.header-nav-disabled:hover { color: rgba(47,74,60,.30); background: transparent; }
 
 .header-right { display: flex; justify-content: flex-end; }
 
 .nav-logout {
   font-size: 0.8125rem;
-  color: rgba(249,246,243,.65);
+  color: #8A9A7E;
+  font-family: 'Karla', system-ui, sans-serif;
   text-decoration: none;
   transition: color .15s;
 }
-.nav-logout:hover { color: #fff; }
+.nav-logout:hover { color: #2F4A3C; }
 
 /* ── Main ── */
 main {
@@ -314,6 +330,41 @@ main {
   transition: color .15s;
 }
 .login-secondary-link:hover { color: var(--green); }
+/* ── Login header (nouveau design Sophie Boutemy) ── */
+.login-header {
+  background: #F6F1E7;
+  margin: -2.5rem -2rem 1.75rem;
+  padding: 1.75rem 2rem 1.5rem;
+  border-radius: var(--radius) var(--radius) 0 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.login-header-logo { flex-shrink: 0; }
+.login-header-text { text-align: left; }
+.login-header-title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #2F4A3C;
+  margin: 0 0 .2rem;
+  line-height: 1.2;
+}
+.login-header-tagline {
+  font-family: 'Karla', system-ui, sans-serif;
+  font-size: .78rem;
+  color: #6B7A5E;
+  margin: 0 0 .25rem;
+  line-height: 1.4;
+}
+.login-header-by {
+  font-family: 'Karla', system-ui, sans-serif;
+  font-size: .75rem;
+  color: #D97A3D;
+  font-weight: 600;
+  margin: 0;
+}
+
 
 /* ── Alerts ── */
 .alert-error {

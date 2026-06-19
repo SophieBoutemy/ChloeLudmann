@@ -380,14 +380,14 @@ def _send_reset_email(to_email, reset_url):
     smtp_password = os.getenv('IMAP_PASSWORD', '')
     body = (
         "Bonjour,\n\n"
-        "Vous avez demandé la réinitialisation de votre mot de passe pour Mon Agent IA.\n\n"
+        "Vous avez demandé la réinitialisation de votre mot de passe pour Mon Adjoint IA.\n\n"
         f"Cliquez sur ce lien pour définir un nouveau mot de passe (valable 1 heure) :\n{reset_url}\n\n"
         "Si vous n'avez pas fait cette demande, ignorez cet email.\n\n"
-        "— La Petite Fabrique Digitale"
+        "— Sophie Boutemy"
     )
     msg = MIMEText(body, 'plain', 'utf-8')
-    msg['Subject'] = 'Réinitialisation de mot de passe — Mon Agent IA'
-    msg['From']    = f'Mon Agent IA <{smtp_user}>'
+    msg['Subject'] = 'Réinitialisation de mot de passe — Mon Adjoint IA'
+    msg['From']    = f'Mon Adjoint IA <{smtp_user}>'
     msg['To']      = to_email
     with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
         server.login(smtp_user, smtp_password)

@@ -2,28 +2,38 @@
 
 {% block title %}Connexion — Dashboard{% endblock %}
 
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Karla:wght@400;500;600&display=swap" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 <div class="login-container">
   <div class="login-box">
-    <div style="display:flex;justify-content:center;margin-bottom:1.5rem;">
-      <svg width="210" height="162" viewBox="-140 -80 280 215" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="0" cy="0" r="46" fill="none" stroke="#354626" stroke-width="1"/>
-        <circle cx="0" cy="0" r="38" fill="#354626"/>
-        <line x1="-46" y1="0" x2="-38" y2="0" stroke="#354626" stroke-width="2"/>
-        <line x1="38" y1="0" x2="46" y2="0" stroke="#354626" stroke-width="2"/>
-        <line x1="0" y1="-46" x2="0" y2="-38" stroke="#354626" stroke-width="2"/>
-        <line x1="0" y1="38" x2="0" y2="46" stroke="#354626" stroke-width="2"/>
-        <circle cx="-46" cy="0" r="2.5" fill="#DD7C0C"/>
-        <circle cx="46" cy="0" r="2.5" fill="#DD7C0C"/>
-        <circle cx="0" cy="-46" r="2.5" fill="#DD7C0C"/>
-        <circle cx="0" cy="46" r="2.5" fill="#DD7C0C"/>
-        <circle cx="0" cy="0" r="26" fill="none" stroke="#DD7C0C" stroke-width="1.5"/>
-        <text x="0" y="8" font-family="Georgia, serif" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="middle">IA</text>
-        <text x="0" y="76" font-family="Georgia, serif" font-size="22" font-weight="700" fill="#354626" text-anchor="middle">Mon Agent IA</text>
-        <line x1="-100" y1="90" x2="100" y2="90" stroke="#DD7C0C" stroke-width="1"/>
-        <text x="0" y="108" font-family="Georgia, serif" font-size="11" fill="#697A4D" text-anchor="middle" letter-spacing="3">LA PETITE FABRIQUE DIGITALE</text>
-      </svg>
+
+    <div class="login-header">
+      <div class="login-header-logo">
+        <svg width="72" height="72" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="0" cy="0" r="46" fill="none" stroke="#2F4A3C" stroke-width="1.5"/>
+          <circle cx="0" cy="0" r="28" fill="#2F4A3C"/>
+          <line x1="-46" y1="0" x2="-36" y2="0" stroke="#2F4A3C" stroke-width="2"/>
+          <line x1="36" y1="0" x2="46" y2="0" stroke="#2F4A3C" stroke-width="2"/>
+          <line x1="0" y1="-46" x2="0" y2="-36" stroke="#2F4A3C" stroke-width="2"/>
+          <line x1="0" y1="36" x2="0" y2="46" stroke="#2F4A3C" stroke-width="2"/>
+          <circle cx="-46" cy="0" r="3" fill="#D97A3D"/>
+          <circle cx="46" cy="0" r="3" fill="#D97A3D"/>
+          <circle cx="0" cy="-46" r="3" fill="#D97A3D"/>
+          <circle cx="0" cy="46" r="3" fill="#D97A3D"/>
+          <circle cx="0" cy="0" r="18" fill="none" stroke="#D97A3D" stroke-width="1.5"/>
+          <text x="0" y="5" font-family="Georgia, serif" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">IA</text>
+        </svg>
+      </div>
+      <div class="login-header-text">
+        <h1 class="login-header-title">Mon Adjoint IA</h1>
+        <p class="login-header-tagline">Des outils digitaux qui travaillent pour vous</p>
+        <p class="login-header-by">par Sophie Boutemy</p>
+      </div>
     </div>
+
     <p class="login-subtitle">Chloé Ludmann</p>
 
     {% if error %}
