@@ -2,10 +2,14 @@ import io
 import json
 import os
 import smtplib
+import sqlite3
 import subprocess
+import uuid
 from datetime import datetime
 from email.mime.text import MIMEText
 from functools import wraps
+
+import anthropic
 
 import requests
 from dotenv import load_dotenv, set_key
@@ -44,6 +48,71 @@ DOCAGE_BASE    = 'https://api.docage.com'
 WAITLIST_JSON    = '/home/ubuntu/automations/liste_attente/waitlist.json'
 WAITLIST_LOG     = '/home/ubuntu/automations/logs/liste_attente.log'
 WAITLIST_SERVICE = 'liste-attente.service'
+
+ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+BTP_DB_PATH       = os.path.join(os.path.dirname(__file__), 'brief_to_post.db')
+
+BTP_SYSTEM_PROMPT = """Tu es expert en communication réseaux sociaux.
+
+Voici trois exemples de publications de cette auteure. Respecte scrupuleusement son style, son rythme, son ton, ses émojis et sa façon d'écrire :
+
+Exemple 1 : J'attendais juste d'être clouée au lit pour vous dévoiler les 548 trésors que j'ai filmés depuis septembre 2025 🤧😁 En parallèle des cours de chant, il se passe tellement de choses ! Beaucoup d'élèves ont osé monter sur scène. Et c'était incroyable 🥰 ILS L'ONT FAIT 🔥 #chantrennes #osersavoix #chantersurscène #agilitévocale #vaincresapeur
+
+Exemple 2 : ✨ Il y a 1 an, 20 voix se sont unies… et aujourd'hui, notre chorale souffle sa première bougie avec toujours autant d'énergie et de passion ! 🎶 A cappella, body-percussions contagieuses et répertoire folk 🎤🔥 Nous accueillons avec joie de nouveaux choristes prêts à partager l'aventure. Et nous rêvons déjà de faire résonner nos harmonies en CONCERT à Rennes 🎵💫 Rejoins-nous ❤️ #chantrennes #choralerennes #folk #folkseventies #bodypercussions
+
+Exemple 3 : Nouvelle rentrée, nouveau challenge : m'exposer un peu plus sur les réseaux et parler de sujets sensibles sur la voix et la technique vocale. 💪🤓 Ici, pas de montage, pas de mixage, pas de micro, pas d'effets. Plein d'imperfections, de la fatigue aussi un peu, de la peur d'être jugée. Jeudi prochain, je passe devant le jury pour candidater au diplôme d'Etat de prof de chant et de technique vocale. Je dois chanter une chanson et j'ai choisi Wicked Game de Chris Isaak. Pour cell.eux qui ne le savent pas encore, je sors d'une longue période de dysphonie de tensions avec des nodules "kisses" (le seul aspect mignon de ce diag'). Plus d'aigus, des douleurs dans la gorge, des yodels incontrôlés... J'ai d'abord appris à trouver des compensations me permettant de continuer à chanter et à enseigner : baisser la tona', ne chanter que dans les graves. Mais à la longue, elles n'ont fait qu'alimenter le problème. Je me suis renseignée, j'ai potassé, je me suis entourée de spécialistes qui m'ont beaucoup aidée (vous-mêmes vous savez). J'ai aussi été soutenue tellement fort par mes élèves 💛 Je me suis formée avec @chant_voix_corps (meilleure décision ever), pour comprendre combien de nombreux mythes et fausses croyances au sujet de la technique vocale sont responsables de ma situation - et de celles d'élèves que j'accompagne également. Aujourd'hui, je suis fière de pouvoir à nouveau m'amuser avec les aigus, décider des yodels, et chanter fort (ou plutôt, avec résonance 🤓). Mais le stress emmène parfois avec lui ces anciennes petites tensions musculaires, qui ne m'aident pas. C'est aussi le traumatisme d'une voix qui déraille de façon incontrôlée, alors que je suis prof' de chant (#crisedelégitimité) qui s'exprime par anticipation. Alors chanter devant vous ici sans filtre, c'est un peu comme me préparer à chanter devant le jury. 🥹 70% des professionnel.les de la voix ont ou ont connu une pathologie vocale (même bénigne). Il faut en parler ! Et montrer que c'est possible de poursuivre sa carrière, de s'ajuster, de comprendre, de s'en sortir et de vibrer encore plus qu'avant. #oserchanter #dysphonie #techniquevocale
+
+RÈGLES DE TON
+- Professionnel : ton factuel, vocabulaire métier, phrases complètes, aucune familiarité excessive
+- Émouvant : expérience personnelle, vocabulaire sensoriel, phrases parfois courtes, une émotion dominante
+- Informatif : structure claire, pédagogie, faits, neutralité émotionnelle
+- Inspirant : projection positive, énergie, encouragement, appel à l'action mesuré
+
+RÈGLES PAR RÉSEAU
+Règle générale : toujours privilégier la lisibilité sur mobile. Utiliser des paragraphes courts et espacés.
+
+Instagram :
+texte court à moyen, paragraphes très courts (1 à 2 phrases max), rythme visuel aéré,
+ton naturel et incarné, emojis autorisés si cohérents, première phrase accrocheuse,
+appel à l'action simple possible, exactement 5 hashtags en fin de publication
+
+Facebook :
+texte narratif plus développé, paragraphes de 2 à 4 phrases, style storytelling,
+ton chaleureux et humain, emojis sobres, question ou invitation à réagir possible en fin,
+hashtags facultatifs (0 à 2 max) en fin de publication
+
+LinkedIn :
+paragraphes courts (1 à 3 phrases max), première ligne accrocheuse, ton professionnel
+et crédible mais humain, partage d'expérience/réflexion, 0 à 2 emojis max, pas de hashtags
+au milieu, maximum 3 hashtags en fin, terminer par une ouverture/question si possible
+
+Newsletter :
+structure email claire, introduction courte et accrocheuse (1 paragraphe), développement
+en 4 à 6 paragraphes substantiels (3 à 5 phrases chacun), pas de hashtags, appel à l'action
+final possible, pas d'excès d'emojis, longueur cible 400 à 600 mots. Rendre le résultat en
+UN SEUL bloc de texte continu (objet + contenu ensemble), sans séparation ni parsing distinct.
+
+MOTS-CLÉS À PRIVILÉGIER
+- développer sa musicalité
+Utilise ce mot-clé de façon naturelle dans le texte, intégré au discours. Ne le répète pas
+inutilement. Ne le liste pas. Ne le transforme pas en hashtag sauf demande explicite.
+
+RÈGLES CRITIQUES
+Le contenu doit être basé uniquement sur le brief utilisateur. Les exemples servent
+uniquement au style, jamais au contenu. Si un élément n'est pas dans le brief, ne pas l'inventer.
+
+Si le brief est vide, absent, tronqué ou incohérent, retourne uniquement :
+"Erreur : brief invalide ou mal formaté."
+
+---
+Maintenant génère un contenu pour {reseau} avec ce brief :
+
+{brief}
+
+Ton souhaité : {ton}.
+
+Retourne uniquement le texte final complet, prêt à être publié ou copié-collé, sans
+préambule, sans JSON, sans balises."""
 
 # Maps frontend field key → (Notion property name, Notion type)
 FIELD_MAP = {
@@ -440,6 +509,13 @@ _AGENT_CARDS = [
         'btn_label': "Ouvrir la liste d'attente",
         'btn_endpoint': 'liste_attente',
     },
+    {
+        'title':       'Brief to Post',
+        'agent_key':   '',
+        'btn_label':   'Ouvrir Brief to Post',
+        'btn_endpoint': 'brief_to_post',
+        'description': "Génération de contenus réseaux sociaux et newsletter via IA (Instagram, Facebook, LinkedIn, Newsletter) à partir d'un brief texte — avec historique et édition inline.",
+    },
 ]
 
 
@@ -461,10 +537,11 @@ def index():
     cards = []
     for cfg in _AGENT_CARDS:
         cards.append({
-            'title':     cfg['title'],
-            'scenarios': by_agent.get(cfg['agent_key'], []),
-            'btn_label': cfg['btn_label'],
-            'btn_url':   url_for(cfg['btn_endpoint']) if cfg['btn_endpoint'] else None,
+            'title':       cfg['title'],
+            'scenarios':   by_agent.get(cfg['agent_key'], []) if cfg['agent_key'] else [],
+            'description': cfg.get('description', ''),
+            'btn_label':   cfg['btn_label'],
+            'btn_url':     url_for(cfg['btn_endpoint']) if cfg['btn_endpoint'] else None,
         })
 
     return render_template('index.html', cards=cards)
@@ -951,6 +1028,116 @@ def liste_attente():
                            waitlist=waitlist,
                            log_events=log_events,
                            service_status=service_status)
+
+
+# ── Brief to Post : SQLite helper ────────────────────────────────────────────
+
+def _btp_db():
+    conn = sqlite3.connect(BTP_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute('''CREATE TABLE IF NOT EXISTS posts (
+        id         TEXT PRIMARY KEY,
+        titre      TEXT DEFAULT '',
+        brief      TEXT NOT NULL,
+        ton        TEXT NOT NULL,
+        reseau     TEXT NOT NULL,
+        texte      TEXT DEFAULT '',
+        statut     TEXT DEFAULT 'Généré',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+    conn.commit()
+    return conn
+
+
+# ── Routes : Brief to Post ────────────────────────────────────────────────────
+
+@app.route('/brief-to-post')
+@login_required
+def brief_to_post():
+    reseau    = request.args.get('reseau', '').strip()
+    date_from = request.args.get('date_from', '').strip()
+    date_to   = request.args.get('date_to', '').strip()
+
+    query  = 'SELECT * FROM posts WHERE 1=1'
+    params = []
+    if reseau:
+        query += ' AND reseau = ?'
+        params.append(reseau)
+    if date_from:
+        query += ' AND date(created_at) >= date(?)'
+        params.append(date_from)
+    if date_to:
+        query += ' AND date(created_at) <= date(?)'
+        params.append(date_to)
+    query += ' ORDER BY created_at DESC'
+
+    conn = _btp_db()
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return render_template('brief_to_post.html', posts=[dict(r) for r in rows],
+                           f_reseau=reseau, f_date_from=date_from, f_date_to=date_to)
+
+
+@app.route('/brief-to-post/generate', methods=['POST'])
+@login_required
+def brief_to_post_generate():
+    data   = request.get_json(silent=True) or {}
+    titre  = data.get('titre', '').strip()
+    brief  = data.get('brief', '').strip()
+    ton    = data.get('ton', '').strip()
+    reseau = data.get('reseau', '').strip()
+
+    if not brief or not ton or not reseau:
+        return jsonify({'ok': False, 'error': 'Champs obligatoires manquants (brief, ton, réseau)'}), 400
+
+    brief_with_titre = f"Titre : {titre}\n\n{brief}" if titre else brief
+
+    try:
+        client  = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        system  = BTP_SYSTEM_PROMPT.format(reseau=reseau, brief=brief_with_titre, ton=ton)
+        message = client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=2048,
+            system=system,
+            messages=[{'role': 'user', 'content': 'Génère le contenu.'}],
+        )
+        texte  = message.content[0].text
+        statut = 'Généré'
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+    post_id = str(uuid.uuid4())
+    conn = _btp_db()
+    conn.execute(
+        'INSERT INTO posts (id, titre, brief, ton, reseau, texte, statut) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        (post_id, titre, brief, ton, reseau, texte, statut),
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        'ok': True, 'id': post_id, 'texte': texte,
+        'titre': titre, 'brief': brief, 'ton': ton, 'reseau': reseau,
+    })
+
+
+@app.route('/brief-to-post/<post_id>', methods=['PATCH', 'DELETE'])
+@login_required
+def brief_to_post_item(post_id):
+    if request.method == 'DELETE':
+        conn = _btp_db()
+        conn.execute('DELETE FROM posts WHERE id = ?', (post_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True})
+
+    data  = request.get_json(silent=True) or {}
+    texte = data.get('texte', '')
+    conn  = _btp_db()
+    conn.execute('UPDATE posts SET texte = ? WHERE id = ?', (texte, post_id))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
 
 
 if __name__ == '__main__':

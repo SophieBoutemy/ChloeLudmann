@@ -1,0 +1,506 @@
+{% extends 'base.html' %}
+
+{% block title %}Brief to Post — Mon Adjoint IA{% endblock %}
+
+{% block extra_head %}
+<style>
+a.back { font-size:.875rem; color:var(--muted); text-decoration:none; }
+a.back:hover { color:var(--green); }
+
+/* ── Form card ── */
+.btp-form-card {
+  background:#fff; border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:1.5rem 1.6rem; margin-bottom:1.5rem;
+}
+.btp-form-card h2 {
+  font-size:1rem; font-weight:600; color:var(--green); margin-bottom:1.1rem;
+}
+.btp-form-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:.85rem .9rem;
+}
+.btp-field-full { grid-column:1 / -1; }
+.btp-form-field { display:flex; flex-direction:column; gap:.3rem; }
+.btp-form-field label {
+  font-size:.8rem; font-weight:600; color:var(--green); letter-spacing:.02em;
+  text-transform:uppercase;
+}
+.btp-optional { font-weight:400; text-transform:none; color:var(--muted); font-size:.75rem; }
+.btp-required { color:var(--orange); }
+
+.btp-input, .btp-select, .btp-textarea {
+  padding:.5rem .75rem; border:1.5px solid var(--border); border-radius:6px;
+  font-size:.875rem; font-family:inherit; color:var(--text);
+  background:#fff; outline:none; transition:border-color .15s;
+}
+.btp-input:focus, .btp-select:focus, .btp-textarea:focus { border-color:var(--green); }
+.btp-textarea { resize:vertical; min-height:110px; line-height:1.55; }
+
+.btp-form-actions {
+  display:flex; align-items:center; gap:1rem; margin-top:1.1rem;
+}
+
+.btn-generate {
+  display:inline-flex; align-items:center; gap:.5rem;
+  padding:.55rem 1.5rem; background:var(--green); color:#fff;
+  border:none; border-radius:6px; font-size:.9rem; font-weight:600;
+  font-family:inherit; cursor:pointer; transition:background .15s;
+}
+.btn-generate:hover:not(:disabled) { background:#2a3a1e; }
+.btn-generate:disabled { opacity:.6; cursor:not-allowed; }
+
+.btp-spinner {
+  width:14px; height:14px; border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite;
+  flex-shrink:0;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+.btp-error-msg {
+  font-size:.825rem; color:#b91c1c; background:#fef2f2;
+  border:1px solid #fecaca; border-radius:5px; padding:.4rem .75rem;
+}
+
+/* ── Filters ── */
+.btp-filters {
+  background:#fff; border-radius:var(--radius); box-shadow:var(--shadow);
+  padding:.75rem 1rem; margin-bottom:1rem;
+  display:flex; flex-wrap:wrap; align-items:center; gap:.5rem;
+}
+.btp-filter-sep {
+  width:1px; height:20px; background:var(--border); flex-shrink:0;
+  margin:0 .15rem;
+}
+.filter-select, .filter-date {
+  padding:.35rem .65rem; border:1.5px solid var(--border); border-radius:6px;
+  font-size:.8125rem; font-family:inherit; color:var(--text);
+  background:#fff; outline:none; cursor:pointer; height:32px;
+}
+.filter-select:focus, .filter-date:focus { border-color:var(--green); }
+.filter-date { cursor:text; }
+.filter-label {
+  font-size:.78rem; color:var(--muted); white-space:nowrap; user-select:none;
+}
+.filters-spacer { flex:1; min-width:.5rem; }
+.btn-shortcut {
+  padding:.3rem .7rem; border:1.5px solid var(--border); border-radius:5px;
+  background:#fff; font-size:.78rem; font-family:inherit; color:var(--text);
+  cursor:pointer; transition:border-color .15s, color .15s; white-space:nowrap;
+}
+.btn-shortcut:hover, .btn-shortcut.active { border-color:var(--green); color:var(--green); }
+.btn-filter-reset {
+  padding:.3rem .7rem; border:none; border-radius:5px;
+  background:transparent; font-size:.78rem; font-family:inherit; color:var(--muted);
+  cursor:pointer; text-decoration:underline;
+}
+.btn-filter-reset:hover { color:var(--green); }
+
+/* ── History ── */
+.btp-history-header {
+  display:flex; align-items:center; gap:.6rem; margin-bottom:.9rem;
+}
+.btp-history-header h2 {
+  font-size:1rem; font-weight:600; color:var(--green);
+}
+.count-badge {
+  display:inline-block; background:var(--green); color:#fff;
+  font-size:.7rem; font-weight:600; padding:.15rem .55rem;
+  border-radius:20px; margin-left:.4rem; vertical-align:middle;
+}
+
+.btp-history-list { display:flex; flex-direction:column; gap:.85rem; }
+
+.btp-empty {
+  text-align:center; padding:3rem 1rem; color:var(--muted);
+  background:#fff; border-radius:var(--radius); box-shadow:var(--shadow);
+}
+
+/* ── Post card ── */
+.btp-post-card {
+  background:#fff; border-radius:var(--radius);
+  box-shadow:var(--shadow); overflow:hidden;
+}
+.btp-post-header {
+  display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;
+  padding:.75rem 1rem; border-bottom:1px solid #f0ece8;
+}
+.btp-post-title {
+  font-size:.875rem; font-weight:600; color:var(--text); margin-right:auto;
+}
+.btp-post-date {
+  font-size:.775rem; color:var(--muted); white-space:nowrap; margin-right:.5rem;
+}
+.btn-delete-post {
+  padding:.2rem .55rem; font-size:.75rem; font-weight:500; font-family:inherit;
+  background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;
+  border-radius:5px; cursor:pointer; transition:background .15s; flex-shrink:0;
+}
+.btn-delete-post:hover { background:#fee2e2; }
+
+/* Réseau badges */
+.badge-reseau {
+  display:inline-block; padding:.15rem .6rem; border-radius:20px;
+  font-size:.72rem; font-weight:600; white-space:nowrap; flex-shrink:0;
+}
+.badge-instagram { background:#fce7f3; color:#9d174d; }
+.badge-facebook  { background:#dbeafe; color:#1e3a5f; }
+.badge-linkedin  { background:#e0f2fe; color:#075985; }
+.badge-newsletter{ background:#dcfce7; color:#166534; }
+.badge-default-r { background:#f3f4f6; color:#374151; }
+
+/* Ton badges */
+.badge-ton {
+  display:inline-block; padding:.13rem .55rem; border-radius:20px;
+  font-size:.72rem; font-weight:500; background:#f0f4ee; color:var(--green);
+  white-space:nowrap; flex-shrink:0;
+}
+
+/* Brief preview */
+.btp-brief-preview {
+  padding:.5rem 1rem;
+  font-size:.8125rem; color:var(--muted);
+  font-style:italic; border-bottom:1px solid #f9f6f3;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Texte généré (éditable) */
+.btp-texte-wrap { padding:.75rem 1rem 1rem; }
+.btp-texte {
+  width:100%; box-sizing:border-box;
+  border:1.5px solid var(--border); border-radius:6px;
+  padding:.6rem .8rem; font-size:.875rem; font-family:inherit;
+  color:var(--text); line-height:1.6; resize:vertical; min-height:120px;
+  outline:none; transition:border-color .15s, box-shadow .15s;
+}
+.btp-texte:focus { border-color:var(--green); }
+.btp-texte.saving { opacity:.6; }
+.btp-texte.saved  { border-color:#22c55e; box-shadow:0 0 0 2px #bbf7d0; }
+.btp-texte.error  { border-color:#ef4444; box-shadow:0 0 0 2px #fecaca; }
+
+.btp-save-status {
+  font-size:.75rem; color:var(--muted); margin-top:.35rem; min-height:1.1em;
+}
+.btp-save-status.ok    { color:#16a34a; }
+.btp-save-status.err   { color:#b91c1c; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Brief to Post</h1>
+    <a href="{{ url_for('index') }}" class="back">← Tableau de bord</a>
+  </div>
+</div>
+
+<!-- ── Formulaire ── -->
+<div class="btp-form-card">
+  <h2>Nouveau contenu</h2>
+  <div class="btp-form-grid">
+    <div class="btp-form-field btp-field-full">
+      <label>Titre <span class="btp-optional">(optionnel)</span></label>
+      <input id="btp-titre" class="btp-input" type="text"
+             placeholder="Ex : Rentrée septembre 2026">
+    </div>
+    <div class="btp-form-field btp-field-full">
+      <label>Brief <span class="btp-required">*</span></label>
+      <textarea id="btp-brief" class="btp-textarea"
+                placeholder="Décris l'idée, l'événement, le message principal..."></textarea>
+    </div>
+    <div class="btp-form-field">
+      <label>Ton <span class="btp-required">*</span></label>
+      <select id="btp-ton" class="btp-select">
+        <option value="">Choisir...</option>
+        <option value="fun">Fun</option>
+        <option value="informatif">Informatif</option>
+        <option value="professionnel">Professionnel</option>
+        <option value="inspirant">Inspirant</option>
+      </select>
+    </div>
+    <div class="btp-form-field">
+      <label>Réseau <span class="btp-required">*</span></label>
+      <select id="btp-reseau" class="btp-select">
+        <option value="">Choisir...</option>
+        <option value="Instagram">Instagram</option>
+        <option value="Facebook">Facebook</option>
+        <option value="LinkedIn">LinkedIn</option>
+        <option value="Newsletter">Newsletter</option>
+      </select>
+    </div>
+  </div>
+  <div class="btp-form-actions">
+    <button id="btp-generate-btn" class="btn-generate" onclick="generate()">
+      <span id="btp-btn-text">Générer</span>
+      <span id="btp-btn-spinner" class="btp-spinner" style="display:none"></span>
+    </button>
+    <span id="btp-error" class="btp-error-msg" style="display:none"></span>
+  </div>
+</div>
+
+<!-- ── Filtres ── -->
+<form method="GET" id="filter-form" action="{{ url_for('brief_to_post') }}">
+  <div class="btp-filters">
+    <span class="filter-label">Réseau :</span>
+    <select name="reseau" class="filter-select" onchange="submitFilter()">
+      <option value="" {% if not f_reseau %}selected{% endif %}>Tous</option>
+      <option value="Instagram" {% if f_reseau == 'Instagram' %}selected{% endif %}>Instagram</option>
+      <option value="Facebook"  {% if f_reseau == 'Facebook'  %}selected{% endif %}>Facebook</option>
+      <option value="LinkedIn"  {% if f_reseau == 'LinkedIn'  %}selected{% endif %}>LinkedIn</option>
+      <option value="Newsletter"{% if f_reseau == 'Newsletter'%}selected{% endif %}>Newsletter</option>
+    </select>
+
+    <div class="btp-filter-sep"></div>
+
+    <span class="filter-label">Du :</span>
+    <input type="date" name="date_from" class="filter-date" id="f-date-from"
+           value="{{ f_date_from }}" onchange="submitFilter()">
+    <span class="filter-label">au :</span>
+    <input type="date" name="date_to" class="filter-date" id="f-date-to"
+           value="{{ f_date_to }}" onchange="submitFilter()">
+
+    <div class="btp-filter-sep"></div>
+
+    <button type="button" class="btn-shortcut {% if not f_date_from and not f_date_to and not f_reseau %}active{% endif %}"
+            onclick="setShortcut(null)">Tout</button>
+    <button type="button" class="btn-shortcut" onclick="setShortcut(7)">7 j</button>
+    <button type="button" class="btn-shortcut" onclick="setShortcut(30)">30 j</button>
+
+    <div class="filters-spacer"></div>
+    {% if f_reseau or f_date_from or f_date_to %}
+    <a href="{{ url_for('brief_to_post') }}" class="btn-filter-reset">Réinitialiser</a>
+    {% endif %}
+  </div>
+</form>
+
+<!-- ── Historique ── -->
+<div class="btp-history-header">
+  <h2>Historique <span class="count-badge" id="btp-count">{{ posts|length }}</span></h2>
+</div>
+
+<div id="btp-list" class="btp-history-list">
+  {% for p in posts %}
+  <div class="btp-post-card" id="card-{{ p.id }}" data-id="{{ p.id }}">
+    <div class="btp-post-header">
+      <span class="badge-reseau {{ 'badge-' + p.reseau|lower }}">{{ p.reseau }}</span>
+      <span class="badge-ton">{{ p.ton }}</span>
+      {% if p.titre %}<span class="btp-post-title">{{ p.titre }}</span>{% endif %}
+      <span class="btp-post-date">{{ p.created_at[:16]|replace('T', ' ') }}</span>
+      <button class="btn-delete-post" onclick="deletePost('{{ p.id }}', this)">Supprimer</button>
+    </div>
+    <div class="btp-brief-preview" title="{{ p.brief }}">{{ p.brief }}</div>
+    <div class="btp-texte-wrap">
+      <textarea class="btp-texte" data-id="{{ p.id }}"
+                onblur="saveTexte(this)"
+                oninput="onTextInput(this)">{{ p.texte }}</textarea>
+      <div class="btp-save-status" id="status-{{ p.id }}"></div>
+    </div>
+  </div>
+  {% else %}
+  <div class="btp-empty" id="btp-empty">Aucune génération pour le moment.</div>
+  {% endfor %}
+</div>
+
+<script>
+const BTP_BASE = "{{ url_for('brief_to_post') }}";
+
+/* ── Filtres ── */
+function submitFilter() {
+  document.getElementById('filter-form').submit();
+}
+
+function setShortcut(days) {
+  const fromEl = document.getElementById('f-date-from');
+  const toEl   = document.getElementById('f-date-to');
+  if (days === null) {
+    fromEl.value = '';
+    toEl.value   = '';
+    document.querySelector('select[name="reseau"]').value = '';
+  } else {
+    const to   = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - days);
+    fromEl.value = from.toISOString().slice(0, 10);
+    toEl.value   = to.toISOString().slice(0, 10);
+  }
+  submitFilter();
+}
+
+/* ── Génération ── */
+function generate() {
+  const titre  = document.getElementById('btp-titre').value.trim();
+  const brief  = document.getElementById('btp-brief').value.trim();
+  const ton    = document.getElementById('btp-ton').value;
+  const reseau = document.getElementById('btp-reseau').value;
+  const errEl  = document.getElementById('btp-error');
+
+  errEl.style.display = 'none';
+
+  if (!brief) { showError('Le brief est obligatoire.'); return; }
+  if (!ton)   { showError('Choisis un ton.'); return; }
+  if (!reseau){ showError('Choisis un réseau.'); return; }
+
+  setLoading(true);
+
+  fetch(BTP_BASE + '/generate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({titre, brief, ton, reseau}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    setLoading(false);
+    if (!data.ok) { showError(data.error || 'Erreur inconnue.'); return; }
+    prependCard(data);
+    document.getElementById('btp-brief').value = '';
+    document.getElementById('btp-titre').value = '';
+  })
+  .catch(err => {
+    setLoading(false);
+    showError('Erreur réseau : ' + err.message);
+  });
+}
+
+function setLoading(on) {
+  const btn    = document.getElementById('btp-generate-btn');
+  const txt    = document.getElementById('btp-btn-text');
+  const spin   = document.getElementById('btp-btn-spinner');
+  btn.disabled = on;
+  txt.textContent = on ? 'Génération…' : 'Générer';
+  spin.style.display = on ? 'inline-block' : 'none';
+}
+
+function showError(msg) {
+  const el = document.getElementById('btp-error');
+  el.textContent = msg;
+  el.style.display = 'inline-block';
+}
+
+/* ── Ajout d'une carte en tête de liste ── */
+function reseauBadgeClass(reseau) {
+  const map = {Instagram:'badge-instagram', Facebook:'badge-facebook',
+                LinkedIn:'badge-linkedin', Newsletter:'badge-newsletter'};
+  return map[reseau] || 'badge-default-r';
+}
+
+function prependCard(p) {
+  const empty = document.getElementById('btp-empty');
+  if (empty) empty.remove();
+
+  const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const card = document.createElement('div');
+  card.className = 'btp-post-card';
+  card.id = 'card-' + p.id;
+  card.dataset.id = p.id;
+  card.innerHTML = `
+    <div class="btp-post-header">
+      <span class="badge-reseau ${reseauBadgeClass(p.reseau)}">${esc(p.reseau)}</span>
+      <span class="badge-ton">${esc(p.ton)}</span>
+      ${p.titre ? `<span class="btp-post-title">${esc(p.titre)}</span>` : ''}
+      <span class="btp-post-date">${now}</span>
+      <button class="btn-delete-post" onclick="deletePost('${p.id}', this)">Supprimer</button>
+    </div>
+    <div class="btp-brief-preview" title="${esc(p.brief)}">${esc(p.brief)}</div>
+    <div class="btp-texte-wrap">
+      <textarea class="btp-texte" data-id="${p.id}"
+                onblur="saveTexte(this)" oninput="onTextInput(this)">${esc(p.texte)}</textarea>
+      <div class="btp-save-status" id="status-${p.id}"></div>
+    </div>`;
+
+  const list = document.getElementById('btp-list');
+  list.prepend(card);
+
+  const count = document.getElementById('btp-count');
+  count.textContent = parseInt(count.textContent || '0') + 1;
+
+  card.querySelector('.btp-texte').focus();
+  card.scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+
+function esc(str) {
+  return String(str || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+/* ── Édition inline ── */
+let _saveTimers = {};
+
+function onTextInput(el) {
+  const id = el.dataset.id;
+  clearTimeout(_saveTimers[id]);
+  _saveTimers[id] = setTimeout(() => saveTexte(el), 1500);
+}
+
+function saveTexte(el) {
+  const id    = el.dataset.id;
+  const texte = el.value;
+  clearTimeout(_saveTimers[id]);
+  el.classList.add('saving');
+
+  fetch(BTP_BASE + '/' + id, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({texte}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    el.classList.remove('saving');
+    const st = document.getElementById('status-' + id);
+    if (data.ok) {
+      el.classList.add('saved');
+      if (st) { st.textContent = 'Sauvegardé ✓'; st.className = 'btp-save-status ok'; }
+      setTimeout(() => {
+        el.classList.remove('saved');
+        if (st) { st.textContent = ''; st.className = 'btp-save-status'; }
+      }, 1800);
+    } else {
+      el.classList.add('error');
+      if (st) { st.textContent = 'Erreur de sauvegarde.'; st.className = 'btp-save-status err'; }
+      setTimeout(() => el.classList.remove('error'), 2500);
+    }
+  })
+  .catch(() => {
+    el.classList.remove('saving');
+    el.classList.add('error');
+    const st = document.getElementById('status-' + id);
+    if (st) { st.textContent = 'Erreur réseau.'; st.className = 'btp-save-status err'; }
+    setTimeout(() => el.classList.remove('error'), 2500);
+  });
+}
+
+/* ── Suppression ── */
+function deletePost(id, btn) {
+  if (!confirm('Supprimer cette version ? Cette action est irréversible.')) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  fetch(BTP_BASE + '/' + id, {method: 'DELETE'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        const card = document.getElementById('card-' + id);
+        card.style.transition = 'opacity .3s';
+        card.style.opacity = '0';
+        setTimeout(() => {
+          card.remove();
+          const count = document.getElementById('btp-count');
+          const n = parseInt(count.textContent || '1') - 1;
+          count.textContent = n;
+          if (n === 0) {
+            document.getElementById('btp-list').innerHTML =
+              '<div class="btp-empty" id="btp-empty">Aucune génération pour le moment.</div>';
+          }
+        }, 300);
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Supprimer';
+        alert('Erreur : ' + (data.error || 'inconnue'));
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = 'Supprimer';
+      alert('Erreur réseau.');
+    });
+}
+</script>
+{% endblock %}

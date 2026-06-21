@@ -77,6 +77,16 @@
   transition: background .15s;
 }
 .btn-agent:hover { background: #EF8F20; }
+.agent-card-description {
+  font-size: .8375rem;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: .85rem;
+  padding: .6rem 0;
+  border-top: 1px solid #e6e1dc;
+  border-bottom: 1px solid #e6e1dc;
+}
+
 .btn-agent-disabled {
   display: inline-block;
   width: auto;
@@ -105,6 +115,7 @@
   {% for card in cards %}
   <div class="agent-card">
     <div class="agent-card-title">{{ card.title }}</div>
+    {% if card.scenarios %}
     <ul class="scenario-list">
       {% for s in card.scenarios %}
       <li class="scenario-item">
@@ -114,6 +125,9 @@
       </li>
       {% endfor %}
     </ul>
+    {% elif card.description %}
+    <p class="agent-card-description">{{ card.description }}</p>
+    {% endif %}
     {% if card.btn_url %}
     <a href="{{ card.btn_url }}" class="btn-agent">{{ card.btn_label }}</a>
     {% else %}
