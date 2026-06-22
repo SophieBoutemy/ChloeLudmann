@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+
+{% block title %}Cours récurrents — Mon Adjoint IA{% endblock %}
+
+{% block extra_head %}
+<style>
+.rc-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.rc-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+
+.rc-card-header {
+  padding: .85rem 1.25rem;
+  border-bottom: 1px solid #f0ece8;
+  font-size: .9375rem;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.rc-card-body {
+  padding: 1.1rem 1.25rem;
+}
+
+/* Lien Tally */
+.tally-link-row {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+
+.tally-url {
+  font-size: .8375rem;
+  color: #444;
+  background: #f7f5f2;
+  border: 1px solid #e6e1dc;
+  border-radius: 6px;
+  padding: .4rem .75rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.btn-copy {
+  padding: .4rem .9rem;
+  background: #DD7C0C;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: .8rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.btn-copy:hover { background: #EF8F20; }
+.btn-copy.copied { background: #4ade80; color: #1a3a1a; }
+
+.tally-note {
+  margin-top: .6rem;
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+/* Stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
+
+.stat-box {
+  border-radius: 7px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.stat-box-pending {
+  background: #fff8f0;
+  border: 1px solid #f5d9b0;
+}
+
+.stat-box-confirmed {
+  background: #f0f7f1;
+  border: 1px solid #b0d9b8;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stat-number-pending  { color: #c07000; }
+.stat-number-confirmed { color: #2a7a2a; }
+
+.stat-label {
+  font-size: .8rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.stat-detail {
+  font-size: .74rem;
+  color: var(--muted);
+  margin-top: .15rem;
+}
+
+/* Services */
+.service-list {
+  list-style: none;
+  border-top: 1px solid #e6e1dc;
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .5rem 0;
+  border-bottom: 1px solid #e6e1dc;
+}
+
+.service-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-ok      { background: #4ade80; }
+.dot-warn    { background: #fbbf24; }
+.dot-stale   { background: #f87171; }
+.dot-unknown { background: #d1d5db; }
+
+.service-name  { font-size: .8125rem; color: #6E6C68; flex: 1; }
+.service-status { font-size: .75rem; color: #a8a49f; white-space: nowrap; }
+
+/* Logs */
+.log-links {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+
+.btn-log {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .45rem .9rem;
+  background: #f7f5f2;
+  border: 1px solid #e6e1dc;
+  border-radius: 6px;
+  font-size: .8175rem;
+  color: #354626;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background .15s;
+  font-family: inherit;
+}
+.btn-log:hover { background: #ede9e3; }
+.btn-log svg { flex-shrink: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Cours récurrents</h1>
+  </div>
+</div>
+
+<div class="rc-grid">
+
+  <!-- Formulaire Tally -->
+  <div class="rc-card">
+    <div class="rc-card-header">Formulaire d'inscription</div>
+    <div class="rc-card-body">
+      <div class="tally-link-row">
+        <span class="tally-url" id="tally-url-text">{{ tally_url }}</span>
+        <button class="btn-copy" id="btn-copy" onclick="copyTallyUrl()">Copier le lien</button>
+      </div>
+      <p class="tally-note">
+        Partagez ce lien à vos élèves pour qu'ils remplissent leur demande de cours récurrents.
+        Les réservations Calendly sont créées automatiquement à la soumission.
+      </p>
+    </div>
+  </div>
+
+  <!-- Statistiques -->
+  <div class="rc-card">
+    <div class="rc-card-header">Réservations</div>
+    <div class="rc-card-body">
+      <div class="stats-grid">
+        <div class="stat-box stat-box-pending">
+          <span class="stat-number stat-number-pending">{{ pending_count }}</span>
+          <span class="stat-label">En attente de réservation</span>
+          <span class="stat-detail">Créneaux &gt; 60 jours — réservation automatique progressive</span>
+        </div>
+        <div class="stat-box stat-box-confirmed">
+          <span class="stat-number stat-number-confirmed">{{ confirmed_count }}</span>
+          <span class="stat-label">Réservations confirmées</span>
+          <span class="stat-detail">Via webhook immédiat + retry automatique</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- État des services -->
+  <div class="rc-card">
+    <div class="rc-card-header">État des services</div>
+    <div class="rc-card-body" style="padding-top:.5rem;padding-bottom:.5rem">
+      <ul class="service-list">
+        {% for s in services %}
+        <li class="service-item">
+          <span class="service-dot dot-{{ s.status.status }}"></span>
+          <span class="service-name">{{ s.name }}</span>
+          <span class="service-status">{{ s.status.label }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <!-- Logs -->
+  <div class="rc-card">
+    <div class="rc-card-header">Logs</div>
+    <div class="rc-card-body">
+      <div class="log-links">
+        <a href="{{ url_for('recurrence_logs', which='webhook') }}" class="btn-log">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          recurrence_calendly.log — Webhook (soumissions Tally)
+        </a>
+        <a href="{{ url_for('recurrence_logs', which='retry') }}" class="btn-log">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          recurrence_retry.log — Retry automatique (quotidien 7h)
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function copyTallyUrl() {
+  const url = document.getElementById('tally-url-text').textContent;
+  const btn = document.getElementById('btn-copy');
+  navigator.clipboard.writeText(url).then(() => {
+    btn.textContent = 'Copié !';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copier le lien';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+</script>
+{% endblock %}

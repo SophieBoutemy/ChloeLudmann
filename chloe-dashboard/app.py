@@ -49,6 +49,11 @@ WAITLIST_JSON    = '/home/ubuntu/automations/liste_attente/waitlist.json'
 WAITLIST_LOG     = '/home/ubuntu/automations/logs/liste_attente.log'
 WAITLIST_SERVICE = 'liste-attente.service'
 
+RECURRENCE_DB_PATH     = '/home/ubuntu/automations/recurrence_calendly/pending.db'
+TALLY_FORM_URL         = 'https://tally.so/r/VLqbG6'
+LOG_RECURRENCE_WEBHOOK = '/home/ubuntu/automations/logs/recurrence_calendly.log'
+LOG_RECURRENCE_RETRY   = '/home/ubuntu/automations/logs/recurrence_retry.log'
+
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
 BTP_DB_PATH       = os.path.join(os.path.dirname(__file__), 'brief_to_post.db')
 
@@ -515,6 +520,12 @@ _AGENT_CARDS = [
         'btn_label':   'Ouvrir Brief to Post',
         'btn_endpoint': 'brief_to_post',
         'description': "Génération de contenus réseaux sociaux et newsletter via IA (Instagram, Facebook, LinkedIn, Newsletter) à partir d'un brief texte — avec historique et édition inline.",
+    },
+    {
+        'title':       'Cours récurrents',
+        'agent_key':   'Cours récurrents',
+        'btn_label':   'Voir les cours récurrents',
+        'btn_endpoint': 'recurrence',
     },
 ]
 
@@ -1138,6 +1149,93 @@ def brief_to_post_item(post_id):
     conn.commit()
     conn.close()
     return jsonify({'ok': True})
+
+
+# ── Routes : cours récurrents ──────────────────────────────────────────
+
+def _recurrence_pending_count():
+    try:
+        conn = sqlite3.connect(RECURRENCE_DB_PATH)
+        n = conn.execute("SELECT COUNT(*) FROM pending").fetchone()[0]
+        conn.close()
+        return n
+    except Exception:
+        return 0
+
+
+def _recurrence_confirmed_count():
+    count = 0
+    for log_path, pattern in [
+        (LOG_RECURRENCE_WEBHOOK, '✓ Réservé'),
+        (LOG_RECURRENCE_RETRY,   'Réservé avec succès'),
+    ]:
+        try:
+            with open(log_path, encoding='utf-8') as f:
+                lines = {l.strip() for l in f if pattern in l and l.strip()}
+            count += len(lines)
+        except FileNotFoundError:
+            pass
+    return count
+
+
+@app.route('/recurrence')
+@login_required
+def recurrence():
+    with open(AUTOMATIONS_CONFIG, encoding='utf-8') as f:
+        automations = json.load(f)
+
+    services = []
+    for a in automations:
+        if a.get('agent') != 'Cours récurrents':
+            continue
+        if a.get('trigger') == 'systemd':
+            status = _systemd_status(a['service'])
+        else:
+            status = _last_execution(a['log'], a.get('stale_after_hours', 25))
+        services.append({'name': a['name'], 'status': status})
+
+    return render_template(
+        'recurrence.html',
+        tally_url=TALLY_FORM_URL,
+        pending_count=_recurrence_pending_count(),
+        confirmed_count=_recurrence_confirmed_count(),
+        services=services,
+    )
+
+
+@app.route('/recurrence/logs/<which>')
+@login_required
+def recurrence_logs(which):
+    MAX_LINES = 100
+    log_configs = {
+        'webhook': {
+            'title':     'recurrence_calendly.log — Webhook Tally',
+            'path':      LOG_RECURRENCE_WEBHOOK,
+            'max_lines': MAX_LINES,
+        },
+        'retry': {
+            'title':     'recurrence_retry.log — Retry automatique',
+            'path':      LOG_RECURRENCE_RETRY,
+            'max_lines': MAX_LINES,
+        },
+    }
+    cfg = log_configs.get(which)
+    if not cfg:
+        return "Log inconnu", 404
+
+    try:
+        with open(cfg['path'], encoding='utf-8') as f:
+            all_lines = f.readlines()
+        deduped = []
+        for line in all_lines:
+            if not deduped or line != deduped[-1]:
+                deduped.append(line)
+        lines = [l.rstrip() for l in deduped[-MAX_LINES:]]
+    except FileNotFoundError:
+        lines = []
+
+    logs = [{'title': cfg['title'], 'lines': lines, 'max_lines': MAX_LINES}]
+    return render_template('recurrence_logs.html', logs=logs)
 
 
 if __name__ == '__main__':

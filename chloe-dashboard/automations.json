@@ -91,5 +91,28 @@
     "frequency": "Service permanent (port 5002)",
     "script": "liste_attente/app.py",
     "agent": "Liste d'attente"
+  },
+  {
+    "id": "recurrence_webhook",
+    "icon": "🗓️",
+    "name": "Webhook réservations récurrentes",
+    "description": "Reçoit les soumissions du formulaire Tally et crée les réservations Calendly hebdomadaires",
+    "trigger": "systemd",
+    "service": "recurrence-calendly.service",
+    "frequency": "Service permanent (port 5007)",
+    "script": "recurrence_calendly/app.py",
+    "agent": "Cours récurrents"
+  },
+  {
+    "id": "recurrence_retry",
+    "icon": "🔄",
+    "name": "Retry réservations automatiques",
+    "description": "Relance quotidienne des créneaux en attente, dès qu'ils entrent dans la fenêtre des 60 jours Calendly",
+    "trigger": "cron",
+    "frequency": "tous les jours à 7h",
+    "script": "recurrence_calendly/retry.py",
+    "log": "/home/ubuntu/automations/logs/recurrence_retry.log",
+    "stale_after_hours": 25,
+    "agent": "Cours récurrents"
   }
 ]

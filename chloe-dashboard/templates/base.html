@@ -47,6 +47,8 @@
            class="header-nav-link nav-desktop-only {% if request.endpoint == 'liste_attente' %}active{% endif %}">Liste d'attente</a>
         <a href="{{ url_for('brief_to_post') }}"
            class="header-nav-link nav-desktop-only {% if request.endpoint in ('brief_to_post', 'brief_to_post_generate', 'brief_to_post_item') %}active{% endif %}">Brief to Post</a>
+        <a href="{{ url_for('recurrence') }}"
+           class="header-nav-link nav-desktop-only {% if request.endpoint in ('recurrence', 'recurrence_logs') %}active{% endif %}">Cours récurrents</a>
       </nav>
 
       <div class="header-right">
