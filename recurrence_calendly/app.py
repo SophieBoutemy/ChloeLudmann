@@ -6,9 +6,10 @@ Webhook Tally VLqbG6 -> reservations recurrentes Calendly
 Endpoint utilise : POST /invitees (Scheduling API, plan Standard)
 Authentification : Personal Access Token (CALENDLY_TOKEN).
 
-Les occurrences au-delà des ~60 jours sont sauvegardées dans pending.db
-et réessayées quotidiennement par retry.py jusqu'à ce qu'elles entrent
-dans la fenêtre d'ouverture Calendly.
+Chaque créneau est vérifié en temps réel via event_type_available_times.
+S'il est disponible, il est réservé immédiatement quelle que soit la date.
+S'il est vide et lointain (> WINDOW_DAYS), il est mis en attente dans pending.db
+et réessayé quotidiennement par retry.py.
 """
 
 import json
@@ -52,8 +53,9 @@ SMTP_USER      = "boutemy.automatisation@gmail.com"
 SMTP_PASS      = os.environ["GMAIL_AUTOMATION_PASSWORD"]
 CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
-# Calendly n'ouvre les créneaux qu'environ 60 jours à l'avance.
-# Les occurrences au-delà de WINDOW_DAYS sont mises en attente et réessayées par retry.py.
+# Seuil utilisé pour classifier une réponse API vide : si le créneau est au-delà
+# de WINDOW_DAYS, on suppose que la fenêtre Calendly n'est pas encore ouverte → pending.
+# Si en deçà et API vide → vraiment indisponible.
 WINDOW_DAYS = int(os.getenv("WINDOW_DAYS", "58"))
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pending.db")
@@ -364,25 +366,31 @@ def check_and_book(event_type_uri: str, location: dict, dt_utc: datetime,
                    name: str, email: str) -> tuple[str, str]:
     """
     Retourne (statut, detail) :
-      "pending"     → au-delà de la fenêtre 60j Calendly — à réessayer plus tard
       "booked"      → réservé avec succès
-      "unavailable" → créneau pris ou hors plage dispo (dans la fenêtre)
+      "pending"     → Calendly renvoie collection vide ET créneau lointain (fenêtre pas encore ouverte)
+      "unavailable" → Calendly renvoie collection vide dans la fenêtre (vraiment pris/bloqué)
       "error"       → erreur inattendue
+
+    On appelle TOUJOURS l'API en premier. is_beyond_window() sert uniquement à
+    classifier la réponse vide, jamais à court-circuiter l'appel.
     """
+    available = is_slot_available(event_type_uri, dt_utc)
+
+    if available:
+        ok, detail = book_slot(event_type_uri, location, dt_utc, name, email)
+        if ok:
+            return "booked", detail
+        if detail == "already_filled":
+            return "unavailable", "créneau déjà réservé"
+        return "error", detail
+
+    # Calendly renvoie collection vide — est-ce parce que la fenêtre n'est pas ouverte ?
     if is_beyond_window(dt_utc):
-        log.info(f"  ⏳ Hors fenêtre 60j — en attente : {dt_utc}")
-        return "pending", "hors fenêtre"
+        log.info(f"  ⏳ API vide + hors fenêtre estimée — en attente : {dt_utc}")
+        return "pending", "hors fenêtre Calendly"
 
-    if not is_slot_available(event_type_uri, dt_utc):
-        log.info(f"  ○ Indisponible (available_times) : {dt_utc}")
-        return "unavailable", "hors plage ou déjà pris"
-
-    ok, detail = book_slot(event_type_uri, location, dt_utc, name, email)
-    if ok:
-        return "booked", detail
-    if detail == "already_filled":
-        return "unavailable", "créneau déjà réservé"
-    return "error", detail
+    log.info(f"  ○ Indisponible (API vide dans la fenêtre) : {dt_utc}")
+    return "unavailable", "hors plage ou déjà pris"
 
 
 # ── Email ─────────────────────────────────────────────────────────────────────
