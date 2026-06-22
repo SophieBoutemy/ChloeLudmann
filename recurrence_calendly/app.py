@@ -107,6 +107,195 @@ MOIS_FR = {
     "septembre": 9, "octobre": 10, "novembre": 11, "decembre": 12, "décembre": 12,
 }
 
+
+# ── Templates email — Charte graphique Chloé Ludmann ────────────────────────
+
+LOGO_URL = "https://chloeludmann.fr/wp-content/uploads/logo-vert-bordsbeiges.png"
+
+EMAIL_WRAPPER_OPEN = """<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#F8EFE2;font-family:'Roboto',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8EFE2;padding:24px 0;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;border-radius:16px;overflow:hidden;max-width:600px;">
+<tr>
+<td style="background-color:#23242C;padding:24px 32px;text-align:center;">
+<img src="{logo_url}" alt="Chloé Ludmann" style="height:48px;margin-bottom:8px;">
+</td>
+</tr>
+"""
+
+EMAIL_WRAPPER_CLOSE = """<tr>
+<td style="background-color:#F8EFE2;padding:20px 32px;text-align:center;">
+<p style="margin:0;font-family:'Fredoka',Arial,sans-serif;color:#419958;font-size:16px;font-weight:600;">
+Chloé Ludmann — Osez votre voix !
+</p>
+<p style="margin:6px 0 0;font-size:12px;color:#23242C;">
+6 rue Desaix - 35000 Rennes
+</p>
+</td>
+</tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>
+"""
+
+
+def build_email_client(prenom_affiche, type_cours, jour_nom, heure_str, freq_label,
+                       date_debut, date_fin, reserves, en_attente, indisponibles):
+    html = EMAIL_WRAPPER_OPEN.format(logo_url=LOGO_URL)
+    html += f"""
+<tr><td style="padding:32px;">
+<h1 style="font-family:'Fredoka',Arial,sans-serif;color:#EA4F26;font-size:24px;margin:0 0 16px;">
+Bonjour {prenom_affiche} !
+</h1>
+<p style="font-size:15px;color:#23242C;line-height:1.6;margin:0 0 24px;">
+Voici la confirmation de tes réservations pour <strong>{type_cours}</strong>,
+le <strong>{jour_nom}</strong> à <strong>{heure_str}</strong> ({freq_label}),
+du <strong>{date_debut}</strong> au <strong>{date_fin}</strong>.
+</p>
+</td></tr>
+"""
+    if reserves:
+        rows = "".join(
+            f"""<tr><td style="padding:10px 16px;background-color:#EAF5EC;border-radius:8px;border-bottom:1px solid #FFFFFF;">
+<span style="font-size:14px;color:#23242C;">{r['date']} — {r['jour_nom']} {r['heure_str']}</span><br>
+<a href="{r['ru']}" style="font-size:12px;color:#419958;text-decoration:none;font-weight:600;">↻ Déplacer</a>
+&nbsp;&nbsp;
+<a href="{r['cu']}" style="font-size:12px;color:#EA4F26;text-decoration:none;font-weight:600;">✕ Annuler</a>
+</td></tr>
+""" for r in reserves
+        )
+        html += f"""
+<tr><td style="padding:0 32px;">
+<h2 style="font-family:'Fredoka',Arial,sans-serif;color:#419958;font-size:18px;margin:0 0 12px;">
+✓ Cours réservés ({len(reserves)})
+</h2>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+{rows}
+</table>
+</td></tr>
+"""
+    if en_attente:
+        rows = "".join(
+            f"""<tr><td style="padding:10px 16px;background-color:#FFF3E0;border-radius:8px;border-bottom:1px solid #FFFFFF;">
+<span style="font-size:14px;color:#23242C;">{e['date']} — {e['jour_nom']} {e['heure_str']}</span>
+</td></tr>
+""" for e in en_attente
+        )
+        html += f"""
+<tr><td style="padding:0 32px;">
+<h2 style="font-family:'Fredoka',Arial,sans-serif;color:#C07000;font-size:18px;margin:0 0 12px;">
+⏳ En attente de confirmation ({len(en_attente)})
+</h2>
+<p style="font-size:13px;color:#23242C;margin:0 0 12px;">
+Ces créneaux ne sont pas encore ouverts dans l'agenda de Chloé. Une réservation automatique sera tentée dès qu'ils seront disponibles.
+</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+{rows}
+</table>
+</td></tr>
+"""
+    if indisponibles:
+        rows = "".join(
+            f"""<tr><td style="padding:10px 16px;background-color:#FBEAEA;border-bottom:1px solid #FFFFFF;">
+<span style="font-size:14px;color:#23242C;">{i['date']} — {i['heure_str']}</span>
+</td></tr>
+""" for i in indisponibles
+        )
+        html += f"""
+<tr><td style="padding:0 32px;">
+<h2 style="font-family:'Fredoka',Arial,sans-serif;color:#EA4F26;font-size:18px;margin:0 0 12px;">
+✕ Non disponibles ({len(indisponibles)})
+</h2>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+{rows}
+</table>
+</td></tr>
+"""
+    html += """
+<tr><td style="padding:0 32px 24px;">
+<p style="font-size:13px;color:#666;line-height:1.5;margin:0;">
+Tout cours annulé moins de 48h à l'avance est dû. Pense à utiliser le lien "Déplacer" si tu as besoin de changer un horaire plus de 48h avant.
+</p>
+</td></tr>
+"""
+    html += EMAIL_WRAPPER_CLOSE
+    return html
+
+
+def build_email_chloe(nom, email, type_cours, jour_nom, heure_str, freq_label,
+                      date_debut, date_fin, reserves, en_attente, indisponibles, erreurs):
+    html = EMAIL_WRAPPER_OPEN.format(logo_url=LOGO_URL)
+    html += f"""
+<tr><td style="padding:32px;">
+<h1 style="font-family:'Fredoka',Arial,sans-serif;color:#419958;font-size:22px;margin:0 0 16px;">
+Nouvelle demande récurrente
+</h1>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:#23242C;margin-bottom:20px;">
+<tr><td style="padding:4px 0;"><strong>Élève :</strong></td><td style="padding:4px 0;">{nom}</td></tr>
+<tr><td style="padding:4px 0;"><strong>Email :</strong></td><td style="padding:4px 0;">{email}</td></tr>
+<tr><td style="padding:4px 0;"><strong>Cours :</strong></td><td style="padding:4px 0;">{type_cours}</td></tr>
+<tr><td style="padding:4px 0;"><strong>Créneau :</strong></td><td style="padding:4px 0;">{jour_nom} {heure_str} — {freq_label}</td></tr>
+<tr><td style="padding:4px 0;"><strong>Période :</strong></td><td style="padding:4px 0;">{date_debut} → {date_fin}</td></tr>
+</table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+<tr>
+<td align="center" style="background-color:#EAF5EC;border-radius:8px;padding:12px;width:25%;">
+<span style="font-size:20px;font-weight:700;color:#419958;">{len(reserves)}</span><br>
+<span style="font-size:11px;color:#23242C;">réservés</span>
+</td>
+<td width="8"></td>
+<td align="center" style="background-color:#FFF3E0;border-radius:8px;padding:12px;width:25%;">
+<span style="font-size:20px;font-weight:700;color:#C07000;">{len(en_attente)}</span><br>
+<span style="font-size:11px;color:#23242C;">en attente</span>
+</td>
+<td width="8"></td>
+<td align="center" style="background-color:#FBEAEA;border-radius:8px;padding:12px;width:25%;">
+<span style="font-size:20px;font-weight:700;color:#EA4F26;">{len(indisponibles)}</span><br>
+<span style="font-size:11px;color:#23242C;">indispo.</span>
+</td>
+<td width="8"></td>
+<td align="center" style="background-color:#FFB7DD;border-radius:8px;padding:12px;width:25%;">
+<span style="font-size:20px;font-weight:700;color:#23242C;">{len(erreurs)}</span><br>
+<span style="font-size:11px;color:#23242C;">erreurs</span>
+</td>
+</tr>
+</table>
+</td></tr>
+"""
+
+    def _block(title, color, bg, items, line_fn):
+        if not items:
+            return ""
+        rows = "".join(
+            f'<tr><td style="padding:6px 12px;background-color:{bg};font-size:13px;color:#23242C;border-bottom:1px solid #FFFFFF;">{line_fn(i)}</td></tr>'
+            for i in items
+        )
+        return (f'<tr><td style="padding:0 32px;">'
+                f'<h2 style="font-family:\'Fredoka\',Arial,sans-serif;color:{color};font-size:15px;margin:0 0 8px;">{title}</h2>'
+                f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">{rows}</table>'
+                f'</td></tr>\n')
+
+    html += _block("Réservés", "#419958", "#EAF5EC", reserves,
+                   lambda r: f"{r['date']} — {r['jour_nom']} {r['heure_str']}")
+    html += _block("En attente", "#C07000", "#FFF3E0", en_attente,
+                   lambda e: f"{e['date']} — {e['jour_nom']} {e['heure_str']}")
+    html += _block("Indisponibles", "#EA4F26", "#FBEAEA", indisponibles,
+                   lambda i: f"{i['date']} — {i['heure_str']}")
+    if erreurs:
+        html += _block("Erreurs", "#23242C", "#FFB7DD", erreurs,
+                       lambda e: f"{e.get('date', '?')} — {e.get('r', 'erreur inconnue')}")
+    html += EMAIL_WRAPPER_CLOSE
+    return html
+
+
 app = Flask(__name__)
 
 
@@ -594,98 +783,16 @@ def tally_webhook():
     )
 
     # ── Email récap au client ───────────────────────────────────────────────
-    th  = "text-align:left;padding:6px 14px;background:#f5f5f5;border-bottom:1px solid #ddd"
-    td  = "padding:6px 14px"
-    tbl = "border-collapse:collapse;width:100%;max-width:560px;margin-bottom:8px"
+    reserves_d      = [{"date": d.strftime("%d/%m/%Y"), "jour_nom": jour_nom, "heure_str": heure_str, "cu": cu, "ru": ru} for d, cu, ru in reserves]
+    en_attente_d    = [{"date": d.strftime("%d/%m/%Y"), "jour_nom": jour_nom, "heure_str": heure_str} for d in en_attente]
+    indisponibles_d = [{"date": d.strftime("%d/%m/%Y"), "heure_str": heure_str} for d in indisponibles]
+    erreurs_d       = [{"date": d.strftime("%d/%m/%Y"), "r": r} for d, r in erreurs]
 
-    def section_ok():
-        if not reserves:
-            return ""
-        lnk = "color:#555;font-size:0.85em"
-        rows = "".join(
-            f"<tr><td style='{td}'>{d.strftime('%d/%m/%Y')} ({jour_nom})</td>"
-            f"<td style='{td}'>{heure_str}</td>"
-            f"<td style='{td};color:#2a7a2a'>Réservé ✓</td>"
-            f"<td style='{td}'>"
-            + (f"<a href='{cu}' style='{lnk}'>Annuler</a> &nbsp;|&nbsp; <a href='{ru}' style='{lnk}'>Déplacer</a>" if cu else "")
-            + f"</td></tr>"
-            for d, cu, ru in reserves
-        )
-        return f"""
-<h3 style="color:#2a7a2a;margin-top:24px">Créneaux réservés ({len(reserves)})</h3>
-<table style="{tbl}">
-  <tr><th style="{th}">Date</th><th style="{th}">Heure</th><th style="{th}">Statut</th><th style="{th}"></th></tr>
-  {rows}
-</table>
-<p style="font-size:0.88em;color:#555">
-  Vous recevrez une confirmation Calendly pour chaque créneau avec l'invitation
-  dans votre calendrier et les rappels habituels.
-</p>"""
-
-    def section_attente():
-        if not en_attente:
-            return ""
-        rows = "".join(
-            f"<tr><td style='{td}'>{d.strftime('%d/%m/%Y')} ({jour_nom})</td>"
-            f"<td style='{td}'>{heure_str}</td>"
-            f"<td style='{td};color:#c07000'>Réservation automatique à venir</td></tr>"
-            for d in en_attente
-        )
-        return f"""
-<h3 style="color:#c07000;margin-top:24px">Créneaux programmés en réservation automatique ({len(en_attente)})</h3>
-<table style="{tbl}">
-  <tr><th style="{th}">Date</th><th style="{th}">Heure</th><th style="{th}">Statut</th></tr>
-  {rows}
-</table>
-<p style="font-size:0.88em;color:#555">
-  Ces créneaux sont au-delà de la fenêtre d'ouverture de Calendly (~60 jours à l'avance).
-  Ils seront <strong>réservés automatiquement</strong> dès que Calendly les rend disponibles.
-  Vous recevrez un email de confirmation pour chacun au moment de la réservation.
-</p>"""
-
-    def section_ko():
-        if not indisponibles and not erreurs:
-            return ""
-        rows = "".join(
-            f"<tr><td style='{td};color:#cc0000'>{d.strftime('%d/%m/%Y')} ({jour_nom})</td>"
-            f"<td style='{td};color:#cc0000'>{heure_str}</td>"
-            f"<td style='{td};color:#cc0000'>Indisponible</td></tr>"
-            for d in indisponibles
-        ) + "".join(
-            f"<tr><td style='{td};color:#cc6600'>{d.strftime('%d/%m/%Y')} ({jour_nom})</td>"
-            f"<td style='{td};color:#cc6600'>{heure_str}</td>"
-            f"<td style='{td};color:#cc6600'>Erreur ({r})</td></tr>"
-            for d, r in erreurs
-        )
-        n = len(indisponibles) + len(erreurs)
-        return f"""
-<h3 style="color:#cc0000;margin-top:24px">Créneaux non disponibles ({n})</h3>
-<table style="{tbl}">
-  <tr><th style="{th}">Date</th><th style="{th}">Heure</th><th style="{th}">Statut</th></tr>
-  {rows}
-</table>
-<p style="font-size:0.88em;color:#555">
-  Contactez Chloé pour ces dates si vous souhaitez trouver une alternative.
-</p>"""
-
-    html_client = f"""
-<html><body style="font-family:sans-serif;color:#222;max-width:620px;margin:0 auto;padding:24px">
-<p>Bonjour {prenom_affiche},</p>
-<p>Suite à votre demande d'inscription aux <strong>{type_cours}</strong>
-   le <strong>{jour_nom}</strong> à <strong>{heure_str}</strong>
-   (<em>{freq_label}</em>),
-   du <strong>{date_debut.strftime('%d/%m/%Y')}</strong>
-   au <strong>{date_fin.strftime('%d/%m/%Y')}</strong> :</p>
-{section_ok()}
-{section_attente()}
-{section_ko()}
-<hr style="margin-top:32px;border:none;border-top:1px solid #eee">
-<p style="font-size:0.85em;color:#888">
-  Cours avec Chloé Ludmann — 6 rue Desaix, 35000 Rennes<br>
-  <a href="https://chloeludmann.fr">chloeludmann.fr</a>
-</p>
-</body></html>"""
-
+    html_client = build_email_client(
+        prenom_affiche, type_cours, jour_nom, heure_str, freq_label,
+        date_debut.strftime("%d/%m/%Y"), date_fin.strftime("%d/%m/%Y"),
+        reserves_d, en_attente_d, indisponibles_d,
+    )
     try:
         send_email(email, "Vos cours de chant — confirmation des réservations", html_client)
         log.info(f"Email récap envoyé à {email}")
@@ -693,35 +800,11 @@ def tally_webhook():
         log.error(f"Erreur email client : {e}")
 
     # ── Notification Chloé ──────────────────────────────────────────────────
-    html_chloe = f"""
-<html><body style="font-family:sans-serif;color:#222;padding:16px">
-<h3>Nouvelle inscription cours récurrents</h3>
-<table style="border-collapse:collapse">
-  <tr><td style="padding:4px 12px;color:#555">Client</td>
-      <td style="padding:4px 12px">{nom}, {email}</td></tr>
-  <tr><td style="padding:4px 12px;color:#555">Type</td>
-      <td style="padding:4px 12px">{type_cours}</td></tr>
-  <tr><td style="padding:4px 12px;color:#555">Créneau</td>
-      <td style="padding:4px 12px">{jour_nom} à {heure_str}</td></tr>
-  <tr><td style="padding:4px 12px;color:#555">Fréquence</td>
-      <td style="padding:4px 12px">{freq_label}</td></tr>
-  <tr><td style="padding:4px 12px;color:#555">Période</td>
-      <td style="padding:4px 12px">{date_debut.strftime('%d/%m/%Y')} → {date_fin.strftime('%d/%m/%Y')}</td></tr>
-  <tr><td style="padding:4px 12px;color:#555">Résultat</td>
-      <td style="padding:4px 12px">
-        <span style="color:#2a7a2a"><strong>{len(reserves)} réservés</strong></span> /
-        <span style="color:#c07000">{len(en_attente)} en attente (auto)</span> /
-        <span style="color:#cc0000">{len(indisponibles)} indisponibles</span> /
-        {len(erreurs)} erreurs
-        (sur {len(occurrences)} occurrences)
-      </td></tr>
-</table>
-<p style="margin-top:12px;color:#555;font-size:0.9em">
-  Les créneaux "en attente" seront réservés automatiquement par retry.py
-  au fur et à mesure qu'ils entrent dans la fenêtre des 60 jours Calendly.
-</p>
-</body></html>"""
-
+    html_chloe = build_email_chloe(
+        nom, email, type_cours, jour_nom, heure_str, freq_label,
+        date_debut.strftime("%d/%m/%Y"), date_fin.strftime("%d/%m/%Y"),
+        reserves_d, en_attente_d, indisponibles_d, erreurs_d,
+    )
     try:
         send_email(
             CHLOE_EMAIL,
