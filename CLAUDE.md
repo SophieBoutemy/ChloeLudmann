@@ -156,7 +156,7 @@ Les vacances sont des exceptions `type=date` avec `intervals=[]` qui écrasent l
 | Période | Dates |
 |---|---|
 | Été 2026 | 4 août → 28 août 2026 (1er août encore ouvert, 31 août réouverture) |
-| Toussaint 2026 | 26 oct → 30 oct 2026 (les 4 jours 26–29 ont une exception explicite ; le 30 renvoie aussi 0 créneau sans exception visible — comportement Calendly non expliqué) |
+| Toussaint 2026 | 26, 27, 28, 29 oct 2026 — chacun a une exception `type=date intervals=[]` individuelle. Le 30 oct n'a aucune exception dans le schedule (la règle wday devrait l'ouvrir), mais `available_times` renvoie `[]` — comportement Calendly non expliqué par les règles visibles. |
 | Noël 2026 | 20 déc → 31 déc 2026 |
 | Carnaval/hiver 2027 | 1er mars → 5 mars 2027 |
 | Ascension 2027 | 9 mai → 22 mai 2027 |
@@ -165,6 +165,14 @@ Les vacances sont des exceptions `type=date` avec `intervals=[]` qui écrasent l
 ### Source de vérité pour les créneaux
 
 `GET /event_type_available_times` est la seule source fiable pour savoir si un créneau est réservable. Le schedule donne le contexte (vacances, horaires), mais l'API retourne l'état réel après fusion des règles, exceptions, et réservations existantes.
+
+### Types de rules disponibles dans l'API
+
+L'endpoint `GET /user_availability_schedules` ne retourne que deux types de rules :
+- `wday` — règle récurrente par jour de semaine (7 entrées : lun–dim)
+- `date` — exception sur une date précise (329 entrées sur le schedule actuel)
+
+Il n'existe pas de type `range` ou `date_range` dans cet endpoint. Les fermetures multi-jours (vacances) sont toujours des exceptions `type=date` individuelles, une par jour.
 
 ### `recurrence_calendly` — logique de fenêtre
 
