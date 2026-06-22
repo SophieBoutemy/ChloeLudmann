@@ -350,9 +350,12 @@ def book_slot(event_type_uri: str, location: dict, dt_utc: datetime,
     }
     code, resp = calendly_post("https://api.calendly.com/invitees", payload)
     if code in (200, 201):
-        uri = resp.get("resource", {}).get("uri", "")
+        resource     = resp.get("resource", {})
+        uri          = resource.get("uri", "")
+        cancel_url   = resource.get("cancel_url", "")
+        reschedule_url = resource.get("reschedule_url", "")
         log.info(f"  ✓ Réservé : {dt_utc} → {uri}")
-        return True, uri
+        return True, {"uri": uri, "cancel_url": cancel_url, "reschedule_url": reschedule_url}
     details = resp.get("details", [])
     codes   = [d.get("code", "") for d in details]
     if "already_filled" in codes:
@@ -574,7 +577,7 @@ def tally_webhook():
     for date_locale, dt_utc in occurrences:
         statut, detail = check_and_book(event_type_uri, location, dt_utc, nom, email)
         if statut == "booked":
-            reserves.append((date_locale, detail))
+            reserves.append((date_locale, detail.get("cancel_url", ""), detail.get("reschedule_url", "")))
         elif statut == "pending":
             en_attente.append(date_locale)
             save_pending(nom, prenom_affiche, email, event_type_uri, location,
@@ -597,16 +600,20 @@ def tally_webhook():
     def section_ok():
         if not reserves:
             return ""
+        lnk = "color:#555;font-size:0.85em"
         rows = "".join(
             f"<tr><td style='{td}'>{d.strftime('%d/%m/%Y')} ({jour_nom})</td>"
             f"<td style='{td}'>{heure_str}</td>"
-            f"<td style='{td};color:#2a7a2a'>Réservé ✓</td></tr>"
-            for d, _ in reserves
+            f"<td style='{td};color:#2a7a2a'>Réservé ✓</td>"
+            f"<td style='{td}'>"
+            + (f"<a href='{cu}' style='{lnk}'>Annuler</a> &nbsp;|&nbsp; <a href='{ru}' style='{lnk}'>Déplacer</a>" if cu else "")
+            + f"</td></tr>"
+            for d, cu, ru in reserves
         )
         return f"""
 <h3 style="color:#2a7a2a;margin-top:24px">Créneaux réservés ({len(reserves)})</h3>
 <table style="{tbl}">
-  <tr><th style="{th}">Date</th><th style="{th}">Heure</th><th style="{th}">Statut</th></tr>
+  <tr><th style="{th}">Date</th><th style="{th}">Heure</th><th style="{th}">Statut</th><th style="{th}"></th></tr>
   {rows}
 </table>
 <p style="font-size:0.88em;color:#555">
