@@ -156,7 +156,7 @@ Les vacances sont des exceptions `type=date` avec `intervals=[]` qui écrasent l
 | Période | Dates |
 |---|---|
 | Été 2026 | 4 août → 28 août 2026 (1er août encore ouvert, 31 août réouverture) |
-| Toussaint 2026 | 26, 27, 28, 29 oct 2026 — chacun a une exception `type=date intervals=[]` individuelle. Le 30 oct n'a aucune exception dans le schedule (la règle wday devrait l'ouvrir), mais `available_times` renvoie `[]` — comportement Calendly non expliqué par les règles visibles. |
+| Toussaint 2026 | 26, 27, 28, 29, 30 oct 2026 — 5 exceptions `type=date intervals=[]` individuelles, toute la semaine fermée. |
 | Noël 2026 | 20 déc → 31 déc 2026 |
 | Carnaval/hiver 2027 | 1er mars → 5 mars 2027 |
 | Ascension 2027 | 9 mai → 22 mai 2027 |
