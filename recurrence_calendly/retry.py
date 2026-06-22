@@ -30,10 +30,11 @@ load_dotenv(os.path.expanduser("~/automations/.env"))
 # ── Config ────────────────────────────────────────────────────────────────────
 
 CALENDLY_TOKEN = os.environ["CALENDLY_TOKEN"]
-SMTP_HOST      = "smtp.gmail.com"
+SMTP_HOST      = "ssl0.ovh.net"
 SMTP_PORT      = 587
-SMTP_USER      = "boutemy.automatisation@gmail.com"
-SMTP_PASS      = os.environ["GMAIL_AUTOMATION_PASSWORD"]
+SMTP_USER      = "contact@chloeludmann.fr"
+SMTP_FROM      = "no-reply@chloeludmann.fr"
+SMTP_PASS      = os.environ["SMTP_PASS"]
 CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
 WINDOW_DAYS = int(os.getenv("WINDOW_DAYS", "58"))
@@ -121,14 +122,14 @@ def book_slot(event_type_uri: str, location: dict, dt_utc: datetime,
 def send_email(to_addr, subject, html_body):
     msg            = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"]    = SMTP_USER
+    msg["From"]    = SMTP_FROM
     msg["To"]      = to_addr
     msg.attach(MIMEText(html_body, "html", "utf-8"))
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
         s.ehlo()
         s.starttls()
         s.login(SMTP_USER, SMTP_PASS)
-        s.sendmail(SMTP_USER, [to_addr], msg.as_string())
+        s.sendmail(SMTP_FROM, [to_addr], msg.as_string())
 
 
 def _email_confirmation(email_addr, prenom, slots):

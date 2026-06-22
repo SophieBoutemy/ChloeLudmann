@@ -47,10 +47,11 @@ log = logging.getLogger(__name__)
 # ── Config ────────────────────────────────────────────────────────────────────
 
 CALENDLY_TOKEN = os.environ["CALENDLY_TOKEN"]
-SMTP_HOST      = "smtp.gmail.com"
+SMTP_HOST      = "ssl0.ovh.net"
 SMTP_PORT      = 587
-SMTP_USER      = "boutemy.automatisation@gmail.com"
-SMTP_PASS      = os.environ["GMAIL_AUTOMATION_PASSWORD"]
+SMTP_USER      = "contact@chloeludmann.fr"
+SMTP_FROM      = "no-reply@chloeludmann.fr"
+SMTP_PASS      = os.environ["SMTP_PASS"]
 CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
 # Seuil utilisé pour classifier une réponse API vide : si le créneau est au-delà
@@ -401,7 +402,7 @@ def check_and_book(event_type_uri: str, location: dict, dt_utc: datetime,
 def send_email(to_addr, subject, html_body, cc=None):
     msg            = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"]    = SMTP_USER
+    msg["From"]    = SMTP_FROM
     msg["To"]      = to_addr
     if cc:
         msg["Cc"] = cc
@@ -410,7 +411,7 @@ def send_email(to_addr, subject, html_body, cc=None):
         s.ehlo()
         s.starttls()
         s.login(SMTP_USER, SMTP_PASS)
-        s.sendmail(SMTP_USER, [to_addr] + ([cc] if cc else []), msg.as_string())
+        s.sendmail(SMTP_FROM, [to_addr] + ([cc] if cc else []), msg.as_string())
 
 
 # ── Webhook ───────────────────────────────────────────────────────────────────
