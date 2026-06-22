@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import re
 import smtplib
 import sqlite3
 import subprocess
@@ -53,6 +54,12 @@ RECURRENCE_DB_PATH     = '/home/ubuntu/automations/recurrence_calendly/pending.d
 TALLY_FORM_URL         = 'https://tally.so/r/VLqbG6'
 LOG_RECURRENCE_WEBHOOK = '/home/ubuntu/automations/logs/recurrence_calendly.log'
 LOG_RECURRENCE_RETRY   = '/home/ubuntu/automations/logs/recurrence_retry.log'
+
+RGPD_PURGE_LOG = '/home/ubuntu/automations/logs/purge_rgpd.log'
+RGPD_LOG_FILES = [
+    LOG_RECURRENCE_WEBHOOK,
+    LOG_RECURRENCE_RETRY,
+]
 
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
 BTP_DB_PATH       = os.path.join(os.path.dirname(__file__), 'brief_to_post.db')
@@ -1236,6 +1243,73 @@ def recurrence_logs(which):
 
     logs = [{'title': cfg['title'], 'lines': lines, 'max_lines': MAX_LINES}]
     return render_template('recurrence_logs.html', logs=logs)
+
+
+# ── Routes : RGPD — droit à l'effacement ─────────────────────────────────────
+
+def _rgpd_purge_email(email: str) -> dict:
+    results = {'db_deleted': 0, 'log_lines': {}, 'errors': []}
+    email_lc = email.lower()
+
+    try:
+        conn = sqlite3.connect(RECURRENCE_DB_PATH)
+        cur  = conn.execute("DELETE FROM pending WHERE lower(email) = ?", (email_lc,))
+        results['db_deleted'] = cur.rowcount
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        results['errors'].append(f"pending.db : {e}")
+
+    for log_path in RGPD_LOG_FILES:
+        fname = os.path.basename(log_path)
+        try:
+            with open(log_path, encoding='utf-8') as f:
+                lines = f.readlines()
+            kept    = [l for l in lines if email_lc not in l.lower()]
+            removed = len(lines) - len(kept)
+            with open(log_path, 'w', encoding='utf-8') as f:
+                f.writelines(kept)
+            results['log_lines'][fname] = removed
+        except FileNotFoundError:
+            results['log_lines'][fname] = 0
+        except Exception as e:
+            results['errors'].append(f"{fname} : {e}")
+
+    return results
+
+
+def _rgpd_audit_log(operator_ip: str, email: str, results: dict):
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    lines = [
+        f"{now} INFO [RGPD] Effacement demandé depuis {operator_ip} pour : {email}\n",
+        f"{now} INFO [RGPD]   pending.db : {results['db_deleted']} entrée(s) supprimée(s)\n",
+    ]
+    for fname, n in results.get('log_lines', {}).items():
+        lines.append(f"{now} INFO [RGPD]   {fname} : {n} ligne(s) supprimée(s)\n")
+    for err in results.get('errors', []):
+        lines.append(f"{now} ERROR [RGPD]   Erreur : {err}\n")
+    try:
+        with open(RGPD_PURGE_LOG, 'a', encoding='utf-8') as f:
+            f.writelines(lines)
+    except Exception:
+        pass
+
+
+@app.route('/rgpd', methods=['GET', 'POST'])
+@login_required
+def rgpd():
+    if request.method == 'POST':
+        email   = request.form.get('email', '').strip()
+        confirm = request.form.get('confirm', '')
+        if not email or confirm != 'EFFACER':
+            return render_template(
+                'rgpd.html',
+                error="Email requis et confirmation « EFFACER » obligatoire.",
+            )
+        results = _rgpd_purge_email(email)
+        _rgpd_audit_log(request.remote_addr or 'inconnu', email, results)
+        return render_template('rgpd.html', done=True, email=email, results=results)
+    return render_template('rgpd.html')
 
 
 if __name__ == '__main__':

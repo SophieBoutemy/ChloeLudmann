@@ -49,6 +49,9 @@
            class="header-nav-link nav-desktop-only {% if request.endpoint in ('brief_to_post', 'brief_to_post_generate', 'brief_to_post_item') %}active{% endif %}">Brief to Post</a>
         <a href="{{ url_for('recurrence') }}"
            class="header-nav-link nav-desktop-only {% if request.endpoint in ('recurrence', 'recurrence_logs') %}active{% endif %}">Cours récurrents</a>
+        <a href="{{ url_for('rgpd') }}"
+           class="header-nav-link nav-desktop-only {% if request.endpoint == 'rgpd' %}active{% endif %}"
+           style="font-size:.78rem;color:var(--muted)">RGPD</a>
       </nav>
 
       <div class="header-right">
