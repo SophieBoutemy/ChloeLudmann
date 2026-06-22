@@ -19,7 +19,9 @@ Structure de la requete de booking :
 import json
 import logging
 import os
+import re
 import smtplib
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -102,6 +104,14 @@ MOIS_FR = {
 }
 
 app = Flask(__name__)
+
+
+def _normalize_et(s):
+    """Minuscules, sans accents, sans tout caractère non-alphanumérique.
+    Permet de matcher 'réguliers30min)' == 'reguliers (30min)'."""
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^a-z0-9]", "", s.lower())
 
 # ── Helpers HTTP ──────────────────────────────────────────────────────────────
 
@@ -350,30 +360,51 @@ def tally_webhook():
     log.info(f"Soumission Tally — champs résolus : {d}")
 
     # ── Extraction ──────────────────────────────────────────────────────────
-    nom        = resolve_field(d, "nom", "prénom et nom", "prenom et nom", "nom complet")
+    # Nom complet : Tally peut envoyer "Prénom" et "Nom" en champs séparés
+    _prenom  = d.get("prénom", d.get("prenom", ""))
+    _nom_seul = resolve_field(d, "nom", "nom complet")
+    if _prenom and _nom_seul:
+        nom = f"{_prenom} {_nom_seul}"
+    elif _prenom:
+        nom = _prenom
+    else:
+        nom = _nom_seul or resolve_field(d, "prénom et nom", "prenom et nom")
+
     email      = resolve_field(d, "email", "e-mail", "adresse email", "adresse e-mail")
-    type_cours = resolve_field(d, "type de cours", "type de cours souhaité", "cours")
-    jour_str   = resolve_field(d, "jour de la semaine", "jour souhaité", "jour").lower().strip()
+    type_cours = resolve_field(d, "type de cours", "type de cours de chant",
+                               "type de cours souhaité", "cours")
+    jour_str   = resolve_field(d, "jour de la semaine", "jour de la semaine souhaité",
+                               "jour souhaité", "jour").lower().strip()
     heure_str  = resolve_field(d, "heure", "heure souhaitée", "horaire").strip()
-    debut_str  = resolve_field(d, "date de début", "date de debut", "début", "debut")
-    fin_str    = resolve_field(d, "date de fin", "fin", "date fin")
+    debut_str  = resolve_field(d, "date de début", "date de début de la période",
+                               "date de debut", "date de debut de la periode", "début", "debut")
+    fin_str    = resolve_field(d, "date de fin", "date de fin de la période",
+                               "date de fin de la periode", "fin", "date fin")
 
     if not all([nom, email, type_cours, jour_str, heure_str, debut_str, fin_str]):
-        log.warning(f"Champs manquants : {d}")
-        return jsonify({"status": "error", "reason": "missing fields"}), 400
+        missing = [k for k, v in {"nom": nom, "email": email, "type_cours": type_cours,
+                                   "jour": jour_str, "heure": heure_str,
+                                   "debut": debut_str, "fin": fin_str}.items() if not v]
+        log.warning(f"Champs manquants {missing} — dict reçu : {d}")
+        return jsonify({"status": "error", "reason": f"missing fields: {missing}"}), 400
 
-    # ── Résolution event type ───────────────────────────────────────────────
-    key_norm = type_cours.lower().strip()
-    key_norm = EVENT_TYPE_ALIASES.get(key_norm, key_norm)
-    et_config = EVENT_TYPES.get(key_norm)
+    # ── Résolution event type (normalisation unicode + sans ponctuation) ────
+    needle = _normalize_et(type_cours)
+    et_config = None
+    # Correspondance exacte normalisée
+    for k, cfg in EVENT_TYPES.items():
+        if _normalize_et(k) == needle:
+            et_config = cfg
+            break
+    # Correspondance partielle normalisée (tolère typos et parenthèses manquantes)
     if not et_config:
-        # Correspondance partielle
         for k, cfg in EVENT_TYPES.items():
-            if key_norm in k or k in key_norm:
+            nk = _normalize_et(k)
+            if needle in nk or nk in needle:
                 et_config = cfg
                 break
     if not et_config:
-        log.warning(f"Event type non reconnu : {type_cours!r}")
+        log.warning(f"Event type non reconnu : {type_cours!r} (normalisé: {needle!r})")
         return jsonify({"status": "error", "reason": f"event type inconnu: {type_cours}"}), 400
 
     event_type_uri = et_config["uri"]
