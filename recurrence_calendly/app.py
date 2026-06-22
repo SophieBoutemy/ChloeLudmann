@@ -123,14 +123,39 @@ def calendly_post(url, body):
 
 # ── Parsing ───────────────────────────────────────────────────────────────────
 
+def resolve_option_text(value, options):
+    """
+    Pour les champs à choix (MULTIPLE_CHOICE, DROPDOWN…), Tally met l'UUID
+    de l'option sélectionnée dans value. Le texte lisible est dans options[].
+    Gère value string (choix unique) et value list (choix multiple).
+    """
+    if not options:
+        return None
+    id_to_text = {o.get("id"): o.get("text", "") for o in options if isinstance(o, dict)}
+    if isinstance(value, str):
+        return id_to_text.get(value)          # None si pas trouvé
+    if isinstance(value, list):
+        texts = [id_to_text.get(v, str(v)) for v in value]
+        return texts[0] if texts else None
+    return None
+
+
 def parse_tally_fields(fields):
     data = {}
     for f in fields:
-        label = f.get("label", "").lower().strip()
-        value = f.get("value", "")
+        label   = f.get("label", "").lower().strip()
+        value   = f.get("value", "")
+        options = f.get("options", [])
+
         if value is None:
             value = ""
-        if isinstance(value, list):
+
+        # Champs à choix : résoudre l'UUID via options[]
+        resolved = resolve_option_text(value, options)
+        if resolved is not None:
+            value = resolved
+        elif isinstance(value, list):
+            # Liste sans options déclarées (dropdown simple, etc.)
             texts = []
             for item in value:
                 if isinstance(item, dict):
@@ -138,6 +163,7 @@ def parse_tally_fields(fields):
                 else:
                     texts.append(str(item))
             value = texts[0] if texts else ""
+
         data[label] = str(value).strip()
     return data
 
@@ -310,11 +336,18 @@ def tally_webhook():
     body = request.get_json(silent=True) or {}
 
     if body.get("eventType") != "FORM_RESPONSE":
+        log.info(f"Événement ignoré : {body.get('eventType')}")
         return jsonify({"status": "ignored"}), 200
 
     fields = body.get("data", {}).get("fields", [])
-    d      = parse_tally_fields(fields)
-    log.info(f"Soumission Tally — champs : {d}")
+    # Log du payload brut pour faciliter le diagnostic
+    log.info(f"Payload Tally brut — {len(fields)} champ(s) : "
+             + json.dumps([{"label": f.get("label"), "type": f.get("type"),
+                            "value": f.get("value"),
+                            "options_count": len(f.get("options", []))}
+                           for f in fields], ensure_ascii=False))
+    d = parse_tally_fields(fields)
+    log.info(f"Soumission Tally — champs résolus : {d}")
 
     # ── Extraction ──────────────────────────────────────────────────────────
     nom        = resolve_field(d, "nom", "prénom et nom", "prenom et nom", "nom complet")
