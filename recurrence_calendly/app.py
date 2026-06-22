@@ -370,6 +370,9 @@ def tally_webhook():
     else:
         nom = _nom_seul or resolve_field(d, "prénom et nom", "prenom et nom")
 
+    # Prénom seul pour les emails (fallback sur nom complet si champ absent)
+    prenom_affiche = _prenom if _prenom else nom
+
     email      = resolve_field(d, "email", "e-mail", "adresse email", "adresse e-mail")
     type_cours = resolve_field(d, "type de cours", "type de cours de chant",
                                "type de cours souhaité", "cours")
@@ -518,7 +521,7 @@ def tally_webhook():
 
     html_client = f"""
 <html><body style="font-family:sans-serif;color:#222;max-width:620px;margin:0 auto;padding:24px">
-<p>Bonjour {nom},</p>
+<p>Bonjour {prenom_affiche},</p>
 <p>Suite à votre demande d'inscription aux <strong>{type_cours}</strong>
    le <strong>{jour_nom}</strong> à <strong>{heure_str}</strong>,
    du <strong>{date_debut.strftime('%d/%m/%Y')}</strong>
@@ -544,7 +547,7 @@ def tally_webhook():
 <h3>Nouvelle inscription cours récurrents</h3>
 <table style="border-collapse:collapse">
   <tr><td style="padding:4px 12px;color:#555">Client</td>
-      <td style="padding:4px 12px"><strong>{nom}</strong> ({email})</td></tr>
+      <td style="padding:4px 12px"><strong>{prenom_affiche}</strong> ({email})</td></tr>
   <tr><td style="padding:4px 12px;color:#555">Type</td>
       <td style="padding:4px 12px">{type_cours}</td></tr>
   <tr><td style="padding:4px 12px;color:#555">Créneau</td>
@@ -568,7 +571,7 @@ def tally_webhook():
     try:
         send_email(
             CHLOE_EMAIL,
-            f"[Récurrence] {nom} — {jour_nom} {heure_str} ({len(reserves)}/{len(occurrences)} réservés)",
+            f"[Récurrence] {prenom_affiche} — {jour_nom} {heure_str} ({len(reserves)}/{len(occurrences)} réservés)",
             html_chloe,
         )
         log.info("Notification envoyée à Chloé")
