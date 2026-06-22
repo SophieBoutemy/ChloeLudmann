@@ -51,7 +51,7 @@ SMTP_HOST      = "ssl0.ovh.net"
 SMTP_PORT      = 587
 SMTP_USER      = "contact@chloeludmann.fr"
 SMTP_FROM      = "no-reply@chloeludmann.fr"
-SMTP_PASS      = os.environ["SMTP_PASS"]
+SMTP_PASS      = os.environ["IMAP_PASSWORD"]
 CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
 # Seuil utilisé pour classifier une réponse API vide : si le créneau est au-delà
