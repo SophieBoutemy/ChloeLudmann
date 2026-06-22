@@ -203,7 +203,7 @@ def resolve_option_text(value, options):
 def parse_tally_fields(fields):
     data = {}
     for f in fields:
-        label   = f.get("label", "").lower().strip()
+        label   = (f.get("label") or "").lower().strip()
         value   = f.get("value", "")
         options = f.get("options", [])
         if value is None:
