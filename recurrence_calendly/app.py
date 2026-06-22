@@ -89,6 +89,15 @@ JOURS_FR = {
 }
 JOURS_FR_INV = {v: k for k, v in JOURS_FR.items()}
 
+FREQ_HEBDO   = "hebdomadaire"
+FREQ_PAIRE   = "paire"
+FREQ_IMPAIRE = "impaire"
+FREQ_LABELS  = {
+    FREQ_HEBDO:   "Toutes les semaines",
+    FREQ_PAIRE:   "Une semaine sur deux (semaine paire)",
+    FREQ_IMPAIRE: "Une semaine sur deux (semaine impaire)",
+}
+
 MOIS_FR = {
     "janvier": 1, "fevrier": 2, "février": 2, "mars": 3, "avril": 4,
     "mai": 5, "juin": 6, "juillet": 7, "aout": 8, "août": 8,
@@ -104,35 +113,40 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pending (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            nom           TEXT NOT NULL,
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            nom            TEXT NOT NULL,
             prenom_affiche TEXT NOT NULL,
-            email         TEXT NOT NULL,
+            email          TEXT NOT NULL,
             event_type_uri TEXT NOT NULL,
-            location_json TEXT NOT NULL,
-            dt_utc        TEXT NOT NULL,
-            heure_str     TEXT NOT NULL,
-            type_cours    TEXT NOT NULL,
-            jour_nom      TEXT NOT NULL,
-            created_at    TEXT NOT NULL,
-            retry_count   INTEGER DEFAULT 0,
-            last_retry    TEXT
+            location_json  TEXT NOT NULL,
+            dt_utc         TEXT NOT NULL,
+            heure_str      TEXT NOT NULL,
+            type_cours     TEXT NOT NULL,
+            jour_nom       TEXT NOT NULL,
+            frequence      TEXT NOT NULL DEFAULT 'hebdomadaire',
+            created_at     TEXT NOT NULL,
+            retry_count    INTEGER DEFAULT 0,
+            last_retry     TEXT
         )
     """)
+    try:
+        conn.execute("ALTER TABLE pending ADD COLUMN frequence TEXT NOT NULL DEFAULT 'hebdomadaire'")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
 
 def save_pending(nom, prenom_affiche, email, event_type_uri, location,
-                 dt_utc, heure_str, type_cours, jour_nom):
+                 dt_utc, heure_str, type_cours, jour_nom, frequence=FREQ_HEBDO):
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
         """INSERT INTO pending
            (nom, prenom_affiche, email, event_type_uri, location_json,
-            dt_utc, heure_str, type_cours, jour_nom, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            dt_utc, heure_str, type_cours, jour_nom, frequence, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (nom, prenom_affiche, email, event_type_uri, json.dumps(location),
-         dt_utc.strftime("%Y-%m-%dT%H:%M:%S"), heure_str, type_cours, jour_nom,
+         dt_utc.strftime("%Y-%m-%dT%H:%M:%S"), heure_str, type_cours, jour_nom, frequence,
          datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")),
     )
     conn.commit()
@@ -261,14 +275,36 @@ def local_to_utc(d: date, h: int, m: int) -> datetime:
     return datetime(d.year, d.month, d.day, h, m, 0) - offset
 
 
-def calc_occurrences(weekday, h, m, date_debut, date_fin):
+def calc_occurrences(weekday, h, m, date_debut, date_fin, frequence=FREQ_HEBDO):
     delta   = (weekday - date_debut.weekday()) % 7
     current = date_debut + timedelta(days=delta)
     result  = []
     while current <= date_fin:
-        result.append((current, local_to_utc(current, h, m)))
+        if frequence == FREQ_HEBDO:
+            result.append((current, local_to_utc(current, h, m)))
+        else:
+            iso_week = current.isocalendar()[1]
+            if frequence == FREQ_PAIRE and iso_week % 2 == 0:
+                result.append((current, local_to_utc(current, h, m)))
+            elif frequence == FREQ_IMPAIRE and iso_week % 2 == 1:
+                result.append((current, local_to_utc(current, h, m)))
         current += timedelta(weeks=1)
     return result
+
+
+def first_valid_occurrence(weekday, date_debut, frequence):
+    """Première date >= date_debut correspondant au bon jour ET à la bonne parité."""
+    delta     = (weekday - date_debut.weekday()) % 7
+    candidate = date_debut + timedelta(days=delta)
+    if frequence == FREQ_HEBDO:
+        return candidate
+    while True:
+        iso_week = candidate.isocalendar()[1]
+        if frequence == FREQ_PAIRE and iso_week % 2 == 0:
+            return candidate
+        if frequence == FREQ_IMPAIRE and iso_week % 2 == 1:
+            return candidate
+        candidate += timedelta(weeks=1)
 
 
 # ── Logique Calendly ──────────────────────────────────────────────────────────
@@ -403,10 +439,19 @@ def tally_webhook():
     jour_str   = resolve_field(d, "jour de la semaine", "jour de la semaine souhaité",
                                "jour souhaité", "jour").lower().strip()
     heure_str  = resolve_field(d, "heure", "heure souhaitée", "horaire").strip()
-    debut_str  = resolve_field(d, "date de début", "date de début de la période",
-                               "date de debut", "date de debut de la periode", "début", "debut")
-    fin_str    = resolve_field(d, "date de fin", "date de fin de la période",
-                               "date de fin de la periode", "fin", "date fin")
+    debut_str    = resolve_field(d, "date de début", "date de début de la période",
+                                 "date de debut", "date de debut de la periode", "début", "debut")
+    fin_str      = resolve_field(d, "date de fin", "date de fin de la période",
+                                 "date de fin de la periode", "fin", "date fin")
+    frequence_str = resolve_field(d, "fréquence", "frequence", "fréquence de cours",
+                                  "fréquence des cours").lower().strip()
+    if "impaire" in frequence_str:
+        frequence = FREQ_IMPAIRE
+    elif "paire" in frequence_str:
+        frequence = FREQ_PAIRE
+    else:
+        frequence = FREQ_HEBDO
+    freq_label = FREQ_LABELS[frequence]
 
     if not all([nom, email, type_cours, jour_str, heure_str, debut_str, fin_str]):
         missing = [k for k, v in {"nom": nom, "email": email, "type_cours": type_cours,
@@ -465,34 +510,36 @@ def tally_webhook():
         return jsonify({"status": "error", "reason": "date_fin < date_debut"}), 400
 
     # ── Occurrences ─────────────────────────────────────────────────────────
-    occurrences = calc_occurrences(weekday, h, m, date_debut, date_fin)
+    occurrences = calc_occurrences(weekday, h, m, date_debut, date_fin, frequence)
     jour_nom    = JOURS_FR_INV[weekday].capitalize()
     log.info(
         f"{len(occurrences)} occurrence(s) — {nom} / {type_cours} / "
-        f"{jour_nom} {heure_str} / {date_debut} → {date_fin}"
+        f"{jour_nom} {heure_str} / {date_debut} → {date_fin} / {freq_label}"
     )
 
-    # La période ne contient aucun jour correspondant au weekday demandé
+    # La période ne contient aucun jour correspondant au weekday demandé (ou à la parité)
     if not occurrences:
-        delta_next  = (weekday - date_debut.weekday()) % 7
-        if delta_next == 0:
-            delta_next = 7  # date_debut est le bon jour mais fin < debut, impossible (déjà vérifié)
-        first_valid = date_debut + timedelta(days=delta_next)
+        first_valid = first_valid_occurrence(weekday, date_debut, frequence)
+        parite_msg  = (
+            f" avec la fréquence « {freq_label} »"
+            if frequence != FREQ_HEBDO else ""
+        )
         log.warning(
-            f"Aucune occurrence : aucun {jour_nom} dans {date_debut} → {date_fin}. "
-            f"Premier {jour_nom} possible : {first_valid}"
+            f"Aucune occurrence : aucun {jour_nom}{parite_msg} dans {date_debut} → {date_fin}. "
+            f"Prochaine occurrence valide : {first_valid}"
         )
         html_no_occ = f"""
 <html><body style="font-family:sans-serif;color:#222;max-width:620px;margin:0 auto;padding:24px">
 <p>Bonjour {prenom_affiche},</p>
 <p>Votre demande de <strong>{type_cours}</strong> le <strong>{jour_nom}</strong>
-   à <strong>{heure_str}</strong> n'a pas pu être traitée : la période choisie
+   à <strong>{heure_str}</strong> (<em>{freq_label}</em>) n'a pas pu être traitée :
+   la période choisie
    (du <strong>{date_debut.strftime('%d/%m/%Y')}</strong>
    au <strong>{date_fin.strftime('%d/%m/%Y')}</strong>)
-   ne contient aucun <strong>{jour_nom}</strong>.</p>
-<p>Le premier <strong>{jour_nom}</strong> après le {date_debut.strftime('%d/%m/%Y')}
+   ne contient aucun <strong>{jour_nom}</strong>{parite_msg}.</p>
+<p>La prochaine occurrence valide après le {date_debut.strftime('%d/%m/%Y')}
    est le <strong>{first_valid.strftime('%d/%m/%Y')}</strong>.<br>
-   Merci de re-soumettre le formulaire avec une période incluant au moins un {jour_nom}.</p>
+   Merci de re-soumettre le formulaire avec une période incluant au moins un {jour_nom}{parite_msg}.</p>
 <hr style="margin-top:32px;border:none;border-top:1px solid #eee">
 <p style="font-size:0.85em;color:#888">
   Cours avec Chloé Ludmann — 6 rue Desaix, 35000 Rennes<br>
@@ -506,7 +553,7 @@ def tally_webhook():
             log.error(f"Erreur email aucune occurrence : {e}")
         return jsonify({
             "status":  "warning",
-            "reason":  f"Aucun {jour_nom} dans la période {date_debut} → {date_fin}",
+            "reason":  f"Aucun {jour_nom}{parite_msg} dans la période {date_debut} → {date_fin}",
             "premier_jour_valide": first_valid.strftime("%d/%m/%Y"),
         }), 200
 
@@ -523,7 +570,7 @@ def tally_webhook():
         elif statut == "pending":
             en_attente.append(date_locale)
             save_pending(nom, prenom_affiche, email, event_type_uri, location,
-                         dt_utc, heure_str, type_cours, jour_nom)
+                         dt_utc, heure_str, type_cours, jour_nom, frequence)
         elif statut == "unavailable":
             indisponibles.append(date_locale)
         else:
@@ -609,7 +656,8 @@ def tally_webhook():
 <html><body style="font-family:sans-serif;color:#222;max-width:620px;margin:0 auto;padding:24px">
 <p>Bonjour {prenom_affiche},</p>
 <p>Suite à votre demande d'inscription aux <strong>{type_cours}</strong>
-   le <strong>{jour_nom}</strong> à <strong>{heure_str}</strong>,
+   le <strong>{jour_nom}</strong> à <strong>{heure_str}</strong>
+   (<em>{freq_label}</em>),
    du <strong>{date_debut.strftime('%d/%m/%Y')}</strong>
    au <strong>{date_fin.strftime('%d/%m/%Y')}</strong> :</p>
 {section_ok()}
@@ -639,6 +687,8 @@ def tally_webhook():
       <td style="padding:4px 12px">{type_cours}</td></tr>
   <tr><td style="padding:4px 12px;color:#555">Créneau</td>
       <td style="padding:4px 12px">{jour_nom} à {heure_str}</td></tr>
+  <tr><td style="padding:4px 12px;color:#555">Fréquence</td>
+      <td style="padding:4px 12px">{freq_label}</td></tr>
   <tr><td style="padding:4px 12px;color:#555">Période</td>
       <td style="padding:4px 12px">{date_debut.strftime('%d/%m/%Y')} → {date_fin.strftime('%d/%m/%Y')}</td></tr>
   <tr><td style="padding:4px 12px;color:#555">Résultat</td>
