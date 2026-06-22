@@ -634,7 +634,7 @@ def tally_webhook():
 <h3>Nouvelle inscription cours récurrents</h3>
 <table style="border-collapse:collapse">
   <tr><td style="padding:4px 12px;color:#555">Client</td>
-      <td style="padding:4px 12px"><strong>{prenom_affiche}</strong> ({email})</td></tr>
+      <td style="padding:4px 12px">{nom}, {email}</td></tr>
   <tr><td style="padding:4px 12px;color:#555">Type</td>
       <td style="padding:4px 12px">{type_cours}</td></tr>
   <tr><td style="padding:4px 12px;color:#555">Créneau</td>
@@ -659,7 +659,7 @@ def tally_webhook():
     try:
         send_email(
             CHLOE_EMAIL,
-            f"[Récurrence] {prenom_affiche} — {jour_nom} {heure_str} "
+            f"[Récurrence] {nom} — {jour_nom} {heure_str} "
             f"({len(reserves)} réservés / {len(en_attente)} en attente / {len(occurrences)} total)",
             html_chloe,
         )

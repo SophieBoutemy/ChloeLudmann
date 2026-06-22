@@ -223,8 +223,8 @@ def _notify_chloe(email_addr, prenom, nom, booked_slots, unavailable_slots):
     type_cours = (booked_slots or unavailable_slots)[0]["type_cours"]
     html = f"""
 <html><body style="font-family:sans-serif;color:#222;padding:16px">
-<h3>Réservation automatique — {prenom}</h3>
-<p><strong>{prenom}</strong> ({email_addr}) — {type_cours}</p>
+<h3>Réservation automatique — {nom}</h3>
+<p>{nom}, {email_addr} — {type_cours}</p>
 <table style="border-collapse:collapse">
   <tr><th style="{th}">Date</th><th style="{th}">Heure</th><th style="{th}">Statut</th></tr>
   {rows_ok}{rows_ko}
@@ -233,7 +233,7 @@ def _notify_chloe(email_addr, prenom, nom, booked_slots, unavailable_slots):
 
     n_ok = len(booked_slots)
     n_ko = len(unavailable_slots)
-    subject = f"[Récurrence auto] {prenom} — {n_ok} réservé(s)" + (f" / {n_ko} indisponible(s)" if n_ko else "")
+    subject = f"[Récurrence auto] {nom} — {n_ok} réservé(s)" + (f" / {n_ko} indisponible(s)" if n_ko else "")
     send_email(CHLOE_EMAIL, subject, html)
 
 
