@@ -54,7 +54,7 @@ CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
 # Calendly n'ouvre les créneaux qu'environ 60 jours à l'avance.
 # Les occurrences au-delà de WINDOW_DAYS sont mises en attente et réessayées par retry.py.
-WINDOW_DAYS = 58
+WINDOW_DAYS = int(os.getenv("WINDOW_DAYS", "58"))
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pending.db")
 

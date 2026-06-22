@@ -36,7 +36,7 @@ SMTP_USER      = "boutemy.automatisation@gmail.com"
 SMTP_PASS      = os.environ["GMAIL_AUTOMATION_PASSWORD"]
 CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
-WINDOW_DAYS    = 58   # même valeur que dans app.py
+WINDOW_DAYS = int(os.getenv("WINDOW_DAYS", "58"))
 MAX_RETRIES    = 5    # nb d'échecs consécutifs dans la fenêtre avant abandon
 
 DB_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pending.db")
