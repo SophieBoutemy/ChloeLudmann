@@ -4,16 +4,11 @@ recurrence_calendly/app.py
 Webhook Tally VLqbG6 -> reservations recurrentes Calendly
 
 Endpoint utilise : POST /invitees (Scheduling API, plan Standard)
-Authentification : Personal Access Token (CALENDLY_TOKEN) — suffisant, confirme par tests.
+Authentification : Personal Access Token (CALENDLY_TOKEN).
 
-Structure de la requete de booking :
-  POST https://api.calendly.com/invitees
-  {
-    "event_type": "<URI>",
-    "start_time": "<ISO8601 UTC>",
-    "invitee": {"name": "...", "email": "...", "timezone": "Europe/Paris"},
-    "location": {"kind": "physical", "location": "6 rue Desaix - 35000 Rennes"}
-  }
+Les occurrences au-delà des ~60 jours sont sauvegardées dans pending.db
+et réessayées quotidiennement par retry.py jusqu'à ce qu'elles entrent
+dans la fenêtre d'ouverture Calendly.
 """
 
 import json
@@ -21,6 +16,7 @@ import logging
 import os
 import re
 import smtplib
+import sqlite3
 import unicodedata
 import urllib.error
 import urllib.parse
@@ -56,14 +52,18 @@ SMTP_USER      = "boutemy.automatisation@gmail.com"
 SMTP_PASS      = os.environ["GMAIL_AUTOMATION_PASSWORD"]
 CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
+# Calendly n'ouvre les créneaux qu'environ 60 jours à l'avance.
+# Les occurrences au-delà de WINDOW_DAYS sont mises en attente et réessayées par retry.py.
+WINDOW_DAYS = 58
+
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pending.db")
+
 CALENDLY_HEADERS = {
     "Authorization": f"Bearer {CALENDLY_TOKEN}",
     "Content-Type": "application/json",
     "User-Agent": "Mozilla/5.0 (compatible; automations-chloe/1.0)",
 }
 
-# URI et location des 4 event types "reguliers"
-# location.kind doit correspondre au kind dans locations[] de l'event type
 EVENT_TYPES = {
     "cours de chant reguliers (30min)": {
         "uri":      "https://api.calendly.com/event_types/002e1ab4-d6dc-478e-838a-f37f704265b2",
@@ -83,14 +83,6 @@ EVENT_TYPES = {
     },
 }
 
-# Aliases avec accents pour la correspondance souple
-EVENT_TYPE_ALIASES = {
-    "cours de chant réguliers (30min)": "cours de chant reguliers (30min)",
-    "cours de chant réguliers (1h)":    "cours de chant reguliers (1h)",
-    "cours de chant réguliers (1h30)":  "cours de chant reguliers (1h30)",
-    "cours de chant réguliers (2h)":    "cours de chant reguliers (2h)",
-}
-
 JOURS_FR = {
     "lundi": 0, "mardi": 1, "mercredi": 2, "jeudi": 3,
     "vendredi": 4, "samedi": 5, "dimanche": 6,
@@ -106,12 +98,58 @@ MOIS_FR = {
 app = Flask(__name__)
 
 
+# ── Base de données (réservations en attente) ─────────────────────────────────
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pending (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            nom           TEXT NOT NULL,
+            prenom_affiche TEXT NOT NULL,
+            email         TEXT NOT NULL,
+            event_type_uri TEXT NOT NULL,
+            location_json TEXT NOT NULL,
+            dt_utc        TEXT NOT NULL,
+            heure_str     TEXT NOT NULL,
+            type_cours    TEXT NOT NULL,
+            jour_nom      TEXT NOT NULL,
+            created_at    TEXT NOT NULL,
+            retry_count   INTEGER DEFAULT 0,
+            last_retry    TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def save_pending(nom, prenom_affiche, email, event_type_uri, location,
+                 dt_utc, heure_str, type_cours, jour_nom):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        """INSERT INTO pending
+           (nom, prenom_affiche, email, event_type_uri, location_json,
+            dt_utc, heure_str, type_cours, jour_nom, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (nom, prenom_affiche, email, event_type_uri, json.dumps(location),
+         dt_utc.strftime("%Y-%m-%dT%H:%M:%S"), heure_str, type_cours, jour_nom,
+         datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")),
+    )
+    conn.commit()
+    conn.close()
+
+
+init_db()
+
+
+# ── Normalisation event type ───────────────────────────────────────────────────
+
 def _normalize_et(s):
-    """Minuscules, sans accents, sans tout caractère non-alphanumérique.
-    Permet de matcher 'réguliers30min)' == 'reguliers (30min)'."""
+    """Minuscules, sans accents, sans ponctuation — pour matcher malgré les typos."""
     s = unicodedata.normalize("NFD", s)
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
     return re.sub(r"[^a-z0-9]", "", s.lower())
+
 
 # ── Helpers HTTP ──────────────────────────────────────────────────────────────
 
@@ -134,16 +172,12 @@ def calendly_post(url, body):
 # ── Parsing ───────────────────────────────────────────────────────────────────
 
 def resolve_option_text(value, options):
-    """
-    Pour les champs à choix (MULTIPLE_CHOICE, DROPDOWN…), Tally met l'UUID
-    de l'option sélectionnée dans value. Le texte lisible est dans options[].
-    Gère value string (choix unique) et value list (choix multiple).
-    """
+    """Résout l'UUID Tally d'un champ à choix en texte lisible."""
     if not options:
         return None
     id_to_text = {o.get("id"): o.get("text", "") for o in options if isinstance(o, dict)}
     if isinstance(value, str):
-        return id_to_text.get(value)          # None si pas trouvé
+        return id_to_text.get(value)
     if isinstance(value, list):
         texts = [id_to_text.get(v, str(v)) for v in value]
         return texts[0] if texts else None
@@ -156,16 +190,12 @@ def parse_tally_fields(fields):
         label   = f.get("label", "").lower().strip()
         value   = f.get("value", "")
         options = f.get("options", [])
-
         if value is None:
             value = ""
-
-        # Champs à choix : résoudre l'UUID via options[]
         resolved = resolve_option_text(value, options)
         if resolved is not None:
             value = resolved
         elif isinstance(value, list):
-            # Liste sans options déclarées (dropdown simple, etc.)
             texts = []
             for item in value:
                 if isinstance(item, dict):
@@ -173,7 +203,6 @@ def parse_tally_fields(fields):
                 else:
                     texts.append(str(item))
             value = texts[0] if texts else ""
-
         data[label] = str(value).strip()
     return data
 
@@ -244,8 +273,11 @@ def calc_occurrences(weekday, h, m, date_debut, date_fin):
 
 # ── Logique Calendly ──────────────────────────────────────────────────────────
 
+def is_beyond_window(dt_utc: datetime) -> bool:
+    return dt_utc.date() > date.today() + timedelta(days=WINDOW_DAYS)
+
+
 def is_slot_available(event_type_uri: str, dt_utc: datetime) -> bool:
-    """Vérifie via event_type_available_times que le créneau exact est libre."""
     start  = dt_utc.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
     end    = (dt_utc + timedelta(minutes=90)).strftime("%Y-%m-%dT%H:%M:%S.000000Z")
     target = dt_utc.strftime("%Y-%m-%dT%H:%M")
@@ -268,10 +300,6 @@ def is_slot_available(event_type_uri: str, dt_utc: datetime) -> bool:
 
 def book_slot(event_type_uri: str, location: dict, dt_utc: datetime,
               name: str, email: str) -> tuple[bool, str]:
-    """
-    Crée une réservation via POST /invitees (Scheduling API).
-    Retourne (True, invitee_uri) en cas de succès, (False, raison) sinon.
-    """
     payload = {
         "event_type": event_type_uri,
         "start_time": dt_utc.strftime("%Y-%m-%dT%H:%M:%S.000000Z"),
@@ -283,20 +311,15 @@ def book_slot(event_type_uri: str, location: dict, dt_utc: datetime,
         "location": location,
     }
     code, resp = calendly_post("https://api.calendly.com/invitees", payload)
-
     if code in (200, 201):
         uri = resp.get("resource", {}).get("uri", "")
         log.info(f"  ✓ Réservé : {dt_utc} → {uri}")
         return True, uri
-
-    # Analyse de l erreur
     details = resp.get("details", [])
     codes   = [d.get("code", "") for d in details]
-
     if "already_filled" in codes:
         log.info(f"  ✗ Slot déjà pris (already_filled) : {dt_utc}")
         return False, "already_filled"
-
     log.warning(f"  ✗ Erreur booking {code} pour {dt_utc}: {json.dumps(resp)[:300]}")
     return False, f"erreur_{code}"
 
@@ -304,12 +327,16 @@ def book_slot(event_type_uri: str, location: dict, dt_utc: datetime,
 def check_and_book(event_type_uri: str, location: dict, dt_utc: datetime,
                    name: str, email: str) -> tuple[str, str]:
     """
-    Vérifie la dispo puis tente la réservation.
     Retourne (statut, detail) :
-      "booked"        → réservé avec succès, detail = invitee_uri
-      "unavailable"   → créneau déjà pris ou hors plage dispo
-      "error"         → erreur inattendue, detail = message
+      "pending"     → au-delà de la fenêtre 60j Calendly — à réessayer plus tard
+      "booked"      → réservé avec succès
+      "unavailable" → créneau pris ou hors plage dispo (dans la fenêtre)
+      "error"       → erreur inattendue
     """
+    if is_beyond_window(dt_utc):
+        log.info(f"  ⏳ Hors fenêtre 60j — en attente : {dt_utc}")
+        return "pending", "hors fenêtre"
+
     if not is_slot_available(event_type_uri, dt_utc):
         log.info(f"  ○ Indisponible (available_times) : {dt_utc}")
         return "unavailable", "hors plage ou déjà pris"
@@ -350,7 +377,6 @@ def tally_webhook():
         return jsonify({"status": "ignored"}), 200
 
     fields = body.get("data", {}).get("fields", [])
-    # Log du payload brut pour faciliter le diagnostic
     log.info(f"Payload Tally brut — {len(fields)} champ(s) : "
              + json.dumps([{"label": f.get("label"), "type": f.get("type"),
                             "value": f.get("value"),
@@ -360,8 +386,7 @@ def tally_webhook():
     log.info(f"Soumission Tally — champs résolus : {d}")
 
     # ── Extraction ──────────────────────────────────────────────────────────
-    # Nom complet : Tally peut envoyer "Prénom" et "Nom" en champs séparés
-    _prenom  = d.get("prénom", d.get("prenom", ""))
+    _prenom   = d.get("prénom", d.get("prenom", ""))
     _nom_seul = resolve_field(d, "nom", "nom complet")
     if _prenom and _nom_seul:
         nom = f"{_prenom} {_nom_seul}"
@@ -370,7 +395,6 @@ def tally_webhook():
     else:
         nom = _nom_seul or resolve_field(d, "prénom et nom", "prenom et nom")
 
-    # Prénom seul pour les emails (fallback sur nom complet si champ absent)
     prenom_affiche = _prenom if _prenom else nom
 
     email      = resolve_field(d, "email", "e-mail", "adresse email", "adresse e-mail")
@@ -391,15 +415,13 @@ def tally_webhook():
         log.warning(f"Champs manquants {missing} — dict reçu : {d}")
         return jsonify({"status": "error", "reason": f"missing fields: {missing}"}), 400
 
-    # ── Résolution event type (normalisation unicode + sans ponctuation) ────
-    needle = _normalize_et(type_cours)
+    # ── Résolution event type ────────────────────────────────────────────────
+    needle    = _normalize_et(type_cours)
     et_config = None
-    # Correspondance exacte normalisée
     for k, cfg in EVENT_TYPES.items():
         if _normalize_et(k) == needle:
             et_config = cfg
             break
-    # Correspondance partielle normalisée (tolère typos et parenthèses manquantes)
     if not et_config:
         for k, cfg in EVENT_TYPES.items():
             nk = _normalize_et(k)
@@ -452,20 +474,25 @@ def tally_webhook():
 
     # ── Vérification + réservation ──────────────────────────────────────────
     reserves      = []   # (date_locale, invitee_uri)
-    indisponibles = []   # date_locale
+    en_attente    = []   # date_locale — hors fenêtre 60j, sauvegardé en DB
+    indisponibles = []   # date_locale — vraiment indisponible dans la fenêtre
     erreurs       = []   # (date_locale, raison)
 
     for date_locale, dt_utc in occurrences:
         statut, detail = check_and_book(event_type_uri, location, dt_utc, nom, email)
         if statut == "booked":
             reserves.append((date_locale, detail))
+        elif statut == "pending":
+            en_attente.append(date_locale)
+            save_pending(nom, prenom_affiche, email, event_type_uri, location,
+                         dt_utc, heure_str, type_cours, jour_nom)
         elif statut == "unavailable":
             indisponibles.append(date_locale)
         else:
             erreurs.append((date_locale, detail))
 
     log.info(
-        f"Résultat : {len(reserves)} réservés / "
+        f"Résultat : {len(reserves)} réservés / {len(en_attente)} en attente / "
         f"{len(indisponibles)} indisponibles / {len(erreurs)} erreurs"
     )
 
@@ -480,7 +507,7 @@ def tally_webhook():
         rows = "".join(
             f"<tr><td style='{td}'>{d.strftime('%d/%m/%Y')} ({jour_nom})</td>"
             f"<td style='{td}'>{heure_str}</td>"
-            f"<td style='{td}' style='color:#2a7a2a'>Réservé ✓</td></tr>"
+            f"<td style='{td};color:#2a7a2a'>Réservé ✓</td></tr>"
             for d, _ in reserves
         )
         return f"""
@@ -492,6 +519,27 @@ def tally_webhook():
 <p style="font-size:0.88em;color:#555">
   Vous recevrez une confirmation Calendly pour chaque créneau avec l'invitation
   dans votre calendrier et les rappels habituels.
+</p>"""
+
+    def section_attente():
+        if not en_attente:
+            return ""
+        rows = "".join(
+            f"<tr><td style='{td}'>{d.strftime('%d/%m/%Y')} ({jour_nom})</td>"
+            f"<td style='{td}'>{heure_str}</td>"
+            f"<td style='{td};color:#c07000'>Réservation automatique à venir</td></tr>"
+            for d in en_attente
+        )
+        return f"""
+<h3 style="color:#c07000;margin-top:24px">Créneaux programmés en réservation automatique ({len(en_attente)})</h3>
+<table style="{tbl}">
+  <tr><th style="{th}">Date</th><th style="{th}">Heure</th><th style="{th}">Statut</th></tr>
+  {rows}
+</table>
+<p style="font-size:0.88em;color:#555">
+  Ces créneaux sont au-delà de la fenêtre d'ouverture de Calendly (~60 jours à l'avance).
+  Ils seront <strong>réservés automatiquement</strong> dès que Calendly les rend disponibles.
+  Vous recevrez un email de confirmation pour chacun au moment de la réservation.
 </p>"""
 
     def section_ko():
@@ -527,6 +575,7 @@ def tally_webhook():
    du <strong>{date_debut.strftime('%d/%m/%Y')}</strong>
    au <strong>{date_fin.strftime('%d/%m/%Y')}</strong> :</p>
 {section_ok()}
+{section_attente()}
 {section_ko()}
 <hr style="margin-top:32px;border:none;border-top:1px solid #eee">
 <p style="font-size:0.85em;color:#888">
@@ -557,21 +606,23 @@ def tally_webhook():
   <tr><td style="padding:4px 12px;color:#555">Résultat</td>
       <td style="padding:4px 12px">
         <span style="color:#2a7a2a"><strong>{len(reserves)} réservés</strong></span> /
+        <span style="color:#c07000">{len(en_attente)} en attente (auto)</span> /
         <span style="color:#cc0000">{len(indisponibles)} indisponibles</span> /
         {len(erreurs)} erreurs
         (sur {len(occurrences)} occurrences)
       </td></tr>
 </table>
 <p style="margin-top:12px;color:#555;font-size:0.9em">
-  Les réservations Calendly sont créées — les invitations calendrier et rappels
-  partent automatiquement.
+  Les créneaux "en attente" seront réservés automatiquement par retry.py
+  au fur et à mesure qu'ils entrent dans la fenêtre des 60 jours Calendly.
 </p>
 </body></html>"""
 
     try:
         send_email(
             CHLOE_EMAIL,
-            f"[Récurrence] {prenom_affiche} — {jour_nom} {heure_str} ({len(reserves)}/{len(occurrences)} réservés)",
+            f"[Récurrence] {prenom_affiche} — {jour_nom} {heure_str} "
+            f"({len(reserves)} réservés / {len(en_attente)} en attente / {len(occurrences)} total)",
             html_chloe,
         )
         log.info("Notification envoyée à Chloé")
@@ -579,11 +630,12 @@ def tally_webhook():
         log.error(f"Erreur notification Chloé : {e}")
 
     return jsonify({
-        "status":       "ok",
-        "reserves":     len(reserves),
+        "status":        "ok",
+        "reserves":      len(reserves),
+        "en_attente":    len(en_attente),
         "indisponibles": len(indisponibles),
-        "erreurs":      len(erreurs),
-        "occurrences":  len(occurrences),
+        "erreurs":       len(erreurs),
+        "occurrences":   len(occurrences),
     }), 200
 
 
