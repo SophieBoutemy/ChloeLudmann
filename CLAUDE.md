@@ -136,6 +136,42 @@ Toutes les valeurs réelles sont dans `/home/ubuntu/automations/.env`. Ne jamais
 
 ---
 
+## Calendly — Planning de Chloé
+
+**Schedule actif** : "Sept 2026 > Juillet 2027" (default=True), timezone Europe/Berlin.
+
+### Règles de base (wday)
+
+Lundi à vendredi ouverts **09h00–20h00** sans exception. Samedi et dimanche fermés.  
+Aucun jour de semaine n'est fermé par défaut — le planning de base couvre les 5 jours.
+
+### Gestion des disponibilités réelles
+
+Chloé ne se base pas sur la règle wday pour ses journées réelles : elle pose des exceptions `type=date` individuelles sur chaque jour travaillé (horaires précis, souvent 14h–18h30 ou 09h–13h30). La règle wday 09h–20h sert de filet de sécurité, mais en pratique presque chaque jour a sa propre exception.
+
+### Vacances / fermetures connues (vérifiées via API)
+
+Les vacances sont des exceptions `type=date` avec `intervals=[]` qui écrasent la règle wday.
+
+| Période | Dates |
+|---|---|
+| Été 2026 | 4 août → 28 août 2026 (1er août encore ouvert, 31 août réouverture) |
+| Toussaint 2026 | 26 oct → 30 oct 2026 (les 4 jours 26–29 ont une exception explicite ; le 30 renvoie aussi 0 créneau sans exception visible — comportement Calendly non expliqué) |
+| Noël 2026 | 20 déc → 31 déc 2026 |
+| Carnaval/hiver 2027 | 1er mars → 5 mars 2027 |
+| Ascension 2027 | 9 mai → 22 mai 2027 |
+| Été 2027 | à partir du 3 août 2027 |
+
+### Source de vérité pour les créneaux
+
+`GET /event_type_available_times` est la seule source fiable pour savoir si un créneau est réservable. Le schedule donne le contexte (vacances, horaires), mais l'API retourne l'état réel après fusion des règles, exceptions, et réservations existantes.
+
+### `recurrence_calendly` — logique de fenêtre
+
+`WINDOW_DAYS=365` dans `.env`. `check_and_book()` appelle toujours `available_times` en premier ; `WINDOW_DAYS` ne sert qu'à classifier une réponse vide (lointain → pending, proche → unavailable).
+
+---
+
 ## Logs
 
 Tous dans `~/automations/logs/`. Pas de logrotate configuré — rotation manuelle.
