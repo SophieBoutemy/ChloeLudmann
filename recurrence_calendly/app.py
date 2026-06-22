@@ -472,6 +472,44 @@ def tally_webhook():
         f"{jour_nom} {heure_str} / {date_debut} → {date_fin}"
     )
 
+    # La période ne contient aucun jour correspondant au weekday demandé
+    if not occurrences:
+        delta_next  = (weekday - date_debut.weekday()) % 7
+        if delta_next == 0:
+            delta_next = 7  # date_debut est le bon jour mais fin < debut, impossible (déjà vérifié)
+        first_valid = date_debut + timedelta(days=delta_next)
+        log.warning(
+            f"Aucune occurrence : aucun {jour_nom} dans {date_debut} → {date_fin}. "
+            f"Premier {jour_nom} possible : {first_valid}"
+        )
+        html_no_occ = f"""
+<html><body style="font-family:sans-serif;color:#222;max-width:620px;margin:0 auto;padding:24px">
+<p>Bonjour {prenom_affiche},</p>
+<p>Votre demande de <strong>{type_cours}</strong> le <strong>{jour_nom}</strong>
+   à <strong>{heure_str}</strong> n'a pas pu être traitée : la période choisie
+   (du <strong>{date_debut.strftime('%d/%m/%Y')}</strong>
+   au <strong>{date_fin.strftime('%d/%m/%Y')}</strong>)
+   ne contient aucun <strong>{jour_nom}</strong>.</p>
+<p>Le premier <strong>{jour_nom}</strong> après le {date_debut.strftime('%d/%m/%Y')}
+   est le <strong>{first_valid.strftime('%d/%m/%Y')}</strong>.<br>
+   Merci de re-soumettre le formulaire avec une période incluant au moins un {jour_nom}.</p>
+<hr style="margin-top:32px;border:none;border-top:1px solid #eee">
+<p style="font-size:0.85em;color:#888">
+  Cours avec Chloé Ludmann — 6 rue Desaix, 35000 Rennes<br>
+  <a href="https://chloeludmann.fr">chloeludmann.fr</a>
+</p>
+</body></html>"""
+        try:
+            send_email(email, "Votre demande de cours — période à corriger", html_no_occ)
+            log.info(f"Email aucune occurrence envoyé à {email}")
+        except Exception as e:
+            log.error(f"Erreur email aucune occurrence : {e}")
+        return jsonify({
+            "status":  "warning",
+            "reason":  f"Aucun {jour_nom} dans la période {date_debut} → {date_fin}",
+            "premier_jour_valide": first_valid.strftime("%d/%m/%Y"),
+        }), 200
+
     # ── Vérification + réservation ──────────────────────────────────────────
     reserves      = []   # (date_locale, invitee_uri)
     en_attente    = []   # date_locale — hors fenêtre 60j, sauvegardé en DB
