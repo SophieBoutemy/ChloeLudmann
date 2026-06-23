@@ -30,11 +30,11 @@ load_dotenv(os.path.expanduser("~/automations/.env"))
 # ── Config ────────────────────────────────────────────────────────────────────
 
 CALENDLY_TOKEN = os.environ["CALENDLY_TOKEN"]
-SMTP_HOST      = "ssl0.ovh.net"
+SMTP_HOST      = "smtp.gmail.com"
 SMTP_PORT      = 587
-SMTP_USER      = "contact@chloeludmann.fr"
-SMTP_FROM      = "no-reply@chloeludmann.fr"
-SMTP_PASS      = os.environ["IMAP_PASSWORD"]
+SMTP_USER      = "boutemy.automatisation@gmail.com"
+SMTP_FROM      = "boutemy.automatisation@gmail.com"
+SMTP_PASS      = os.environ["GMAIL_AUTOMATION_PASSWORD"]
 CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
 WINDOW_DAYS     = int(os.getenv("WINDOW_DAYS", "365"))   # horizon métier (= booking horizon)
