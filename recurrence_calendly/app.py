@@ -279,29 +279,6 @@ Nouvelle demande récurrente
 <tr><td style="padding:4px 0;"><strong>Créneau :</strong></td><td style="padding:4px 0;">{jour_nom} {heure_str} — {freq_label}</td></tr>
 <tr><td style="padding:4px 0;"><strong>Période :</strong></td><td style="padding:4px 0;">{date_debut} → {date_fin}</td></tr>
 </table>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-<tr>
-<td align="center" style="background-color:#419958; border-radius:8px; padding:14px 4px; width:25%;">
-<span style="font-size:20px; font-weight:700; color:#FFFFFF;">{len(reserves)}</span><br>
-<span style="font-size:11px; color:#FFFFFF;">réservés</span>
-</td>
-<td width="6"></td>
-<td align="center" style="background-color:#F8EFE2; border:1px solid #23242C; border-radius:8px; padding:14px 4px; width:25%;">
-<span style="font-size:20px; font-weight:700; color:#23242C;">{len(en_attente)}</span><br>
-<span style="font-size:11px; color:#23242C;">en attente</span>
-</td>
-<td width="6"></td>
-<td align="center" style="background-color:#EA4F26; border-radius:8px; padding:14px 4px; width:25%;">
-<span style="font-size:20px; font-weight:700; color:#FFFFFF;">{len(indisponibles)}</span><br>
-<span style="font-size:11px; color:#FFFFFF;">indispo.</span>
-</td>
-<td width="6"></td>
-<td align="center" style="background-color:#23242C; border-radius:8px; padding:14px 4px; width:25%;">
-<span style="font-size:20px; font-weight:700; color:#FFFFFF;">{len(erreurs)}</span><br>
-<span style="font-size:11px; color:#FFFFFF;">erreurs</span>
-</td>
-</tr>
-</table>
 </td>
 </tr>
 """
