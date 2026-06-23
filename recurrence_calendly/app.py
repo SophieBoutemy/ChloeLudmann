@@ -47,11 +47,11 @@ log = logging.getLogger(__name__)
 # ── Config ────────────────────────────────────────────────────────────────────
 
 CALENDLY_TOKEN = os.environ["CALENDLY_TOKEN"]
-SMTP_HOST      = "ssl0.ovh.net"
+SMTP_HOST      = "smtp.gmail.com"
 SMTP_PORT      = 587
-SMTP_USER      = "contact@chloeludmann.fr"
-SMTP_FROM      = "no-reply@chloeludmann.fr"
-SMTP_PASS      = os.environ["IMAP_PASSWORD"]
+SMTP_USER      = "boutemy.automatisation@gmail.com"
+SMTP_FROM      = "boutemy.automatisation@gmail.com"
+SMTP_PASS      = os.environ["GMAIL_AUTOMATION_PASSWORD"]
 CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
 # Seuil utilisé pour classifier une réponse API vide : si le créneau est au-delà
@@ -578,9 +578,9 @@ def check_and_book(event_type_uri: str, location: dict, dt_utc: datetime,
             return "unavailable", "créneau déjà réservé"
         return "error", detail
 
-    # API vide dans l'horizon → en attente (fenêtre Calendly pas encore ouverte)
-    log.info(f"  ⏳ En attente (API vide) : {dt_utc}")
-    return "pending", "créneau non disponible dans l'API"
+    # API vide = créneau indisponible (pris ou jour fermé)
+    log.info(f"  ✗ Indisponible (API vide) : {dt_utc}")
+    return "unavailable", "créneau non disponible dans l'API"
 
 
 # ── Email ─────────────────────────────────────────────────────────────────────
