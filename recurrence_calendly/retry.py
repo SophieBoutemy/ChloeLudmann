@@ -37,8 +37,9 @@ SMTP_FROM      = "no-reply@chloeludmann.fr"
 SMTP_PASS      = os.environ["IMAP_PASSWORD"]
 CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
-WINDOW_DAYS = int(os.getenv("WINDOW_DAYS", "58"))
-MAX_RETRIES    = 5    # nb d'échecs consécutifs dans la fenêtre avant abandon
+WINDOW_DAYS     = int(os.getenv("WINDOW_DAYS", "365"))   # horizon métier (= booking horizon)
+CALENDLY_WINDOW = int(os.getenv("CALENDLY_WINDOW", "60")) # fenêtre technique Calendly (~jours avant lesquels l'API retourne des créneaux)
+MAX_RETRIES     = 5    # nb d'échecs consécutifs dans la fenêtre Calendly avant abandon
 
 DB_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pending.db")
 LOG_FILE = os.path.expanduser("~/automations/logs/recurrence_retry.log")
@@ -246,8 +247,8 @@ def main():
     rows = conn.execute("SELECT * FROM pending ORDER BY dt_utc ASC").fetchall()
     log.info(f"Relance quotidienne : {len(rows)} créneau(x) en attente")
 
-    today        = date.today()
-    window_limit = today + timedelta(days=WINDOW_DAYS)
+    today          = date.today()
+    calendly_limit = today + timedelta(days=CALENDLY_WINDOW)
 
     # Regroupement des résultats par client pour envoi d'emails groupés
     # Structure : { email: { "prenom": ..., "nom": ..., "booked": [...], "unavailable": [...] } }
@@ -275,12 +276,12 @@ def main():
             _get_client(row["email"], row["prenom_affiche"], row["nom"])["unavailable"].append(slot)
             continue
 
-        # Toujours hors fenêtre → skip
-        if d_local > window_limit:
-            log.info(f"Hors fenêtre ({d_local} > {window_limit}) : skip")
+        # Créneau encore hors fenêtre technique Calendly → skip silencieux (pas de retry_count)
+        if d_local > calendly_limit:
+            log.debug(f"Hors fenêtre Calendly ({d_local} > {calendly_limit}) : skip")
             continue
 
-        # Dans la fenêtre — vérification de dispo
+        # Dans la fenêtre Calendly — vérification de dispo
         location = json.loads(row["location_json"])
 
         if not is_slot_available(row["event_type_uri"], dt_utc):
@@ -289,10 +290,10 @@ def main():
                 "UPDATE pending SET retry_count = ?, last_retry = ? WHERE id = ?",
                 (new_count, today.isoformat(), row["id"]),
             )
-            log.info(f"Indisponible dans la fenêtre (tentative {new_count}/{MAX_RETRIES}) : {row['dt_utc']}")
+            log.info(f"Indisponible dans la fenêtre Calendly (tentative {new_count}/{MAX_RETRIES}) : {row['dt_utc']}")
 
             if new_count >= MAX_RETRIES:
-                log.warning(f"Abandon après {new_count} tentatives : {row['dt_utc']}")
+                log.warning(f"Abandon après {new_count} tentatives dans la fenêtre : {row['dt_utc']}")
                 conn.execute("DELETE FROM pending WHERE id = ?", (row["id"],))
                 _get_client(row["email"], row["prenom_affiche"], row["nom"])["unavailable"].append(slot)
             continue

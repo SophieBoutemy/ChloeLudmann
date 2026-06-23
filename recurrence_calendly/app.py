@@ -560,13 +560,14 @@ def check_and_book(event_type_uri: str, location: dict, dt_utc: datetime,
     """
     Retourne (statut, detail) :
       "booked"      → réservé avec succès
-      "pending"     → Calendly renvoie collection vide ET créneau lointain (fenêtre pas encore ouverte)
-      "unavailable" → Calendly renvoie collection vide dans la fenêtre (vraiment pris/bloqué)
-      "error"       → erreur inattendue
-
-    On appelle TOUJOURS l'API en premier. is_beyond_window() sert uniquement à
-    classifier la réponse vide, jamais à court-circuiter l'appel.
+      "pending"     → API vide dans l'horizon — retry.py retentera quand Calendly ouvrira
+      "unavailable" → créneau pris entre la vérification et la tentative (race condition)
+      "error"       → date hors horizon métier (> WINDOW_DAYS j) ou erreur inattendue
     """
+    if is_beyond_window(dt_utc):
+        log.info(f"  ✗ Hors horizon de réservation ({WINDOW_DAYS}j) : {dt_utc}")
+        return "error", f"hors horizon ({WINDOW_DAYS}j)"
+
     available = is_slot_available(event_type_uri, dt_utc)
 
     if available:
@@ -577,13 +578,9 @@ def check_and_book(event_type_uri: str, location: dict, dt_utc: datetime,
             return "unavailable", "créneau déjà réservé"
         return "error", detail
 
-    # Calendly renvoie collection vide — est-ce parce que la fenêtre n'est pas ouverte ?
-    if is_beyond_window(dt_utc):
-        log.info(f"  ⏳ API vide + hors fenêtre estimée — en attente : {dt_utc}")
-        return "pending", "hors fenêtre Calendly"
-
-    log.info(f"  ○ Indisponible (API vide dans la fenêtre) : {dt_utc}")
-    return "unavailable", "hors plage ou déjà pris"
+    # API vide dans l'horizon → en attente (fenêtre Calendly pas encore ouverte)
+    log.info(f"  ⏳ En attente (API vide) : {dt_utc}")
+    return "pending", "créneau non disponible dans l'API"
 
 
 # ── Email ─────────────────────────────────────────────────────────────────────
