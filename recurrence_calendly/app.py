@@ -25,6 +25,7 @@ import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.header import Header
 
 from flask import Flask, jsonify, request
 from dotenv import load_dotenv
@@ -108,37 +109,49 @@ MOIS_FR = {
 }
 
 
-# ── Templates email — Charte graphique Chloé Ludmann ────────────────────────
+# ── Templates email — Charte graphique Chloé Ludmann v2 ──────────────────────
 
 LOGO_URL = "https://chloeludmann.fr/wp-content/uploads/logo-vert-bordsbeiges.png"
 
-EMAIL_WRAPPER_OPEN = """<!DOCTYPE html>
+EMAIL_WRAPPER_OPEN = """
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<style>
+  :root {{ color-scheme: light; supported-color-schemes: light; }}
+  body, table, td {{ -webkit-text-size-adjust: 100%; }}
+</style>
 </head>
-<body style="margin:0;padding:0;background-color:#F8EFE2;font-family:'Roboto',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8EFE2;padding:24px 0;">
+<body style="margin:0; padding:0; background-color:#F8EFE2; font-family:'Roboto', Arial, sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8EFE2; padding:24px 0;">
 <tr><td align="center">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;border-radius:16px;overflow:hidden;max-width:600px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF; border-radius:16px; overflow:hidden; max-width:600px; border:1px solid #F8EFE2;">
+
+<!-- HEADER : fond noir, texte/logo en blanc -->
 <tr>
-<td style="background-color:#23242C;padding:24px 32px;text-align:center;">
-<img src="{logo_url}" alt="Chloé Ludmann" style="height:48px;margin-bottom:8px;">
+<td style="background-color:#23242C; padding:24px 32px; text-align:center;">
+<img src="{logo_url}" alt="Chloé Ludmann" style="height:44px;">
 </td>
 </tr>
 """
 
-EMAIL_WRAPPER_CLOSE = """<tr>
-<td style="background-color:#F8EFE2;padding:20px 32px;text-align:center;">
-<p style="margin:0;font-family:'Fredoka',Arial,sans-serif;color:#419958;font-size:16px;font-weight:600;">
+EMAIL_WRAPPER_CLOSE = """
+<!-- FOOTER : fond beige, texte vert + noir -->
+<tr>
+<td style="background-color:#F8EFE2; padding:20px 32px; text-align:center;">
+<p style="margin:0; font-family:'Fredoka', Arial, sans-serif; color:#419958; font-size:16px; font-weight:700;">
 Chloé Ludmann — Osez votre voix !
 </p>
-<p style="margin:6px 0 0;font-size:12px;color:#23242C;">
+<p style="margin:6px 0 0; font-size:12px; color:#23242C;">
 6 rue Desaix - 35000 Rennes
 </p>
 </td>
 </tr>
+
 </table>
 </td></tr>
 </table>
@@ -148,97 +161,118 @@ Chloé Ludmann — Osez votre voix !
 
 
 def build_email_client(prenom_affiche, type_cours, jour_nom, heure_str, freq_label,
-                       date_debut, date_fin, reserves, en_attente, indisponibles):
+                        date_debut, date_fin, reserves, en_attente, indisponibles):
+
     html = EMAIL_WRAPPER_OPEN.format(logo_url=LOGO_URL)
+
     html += f"""
-<tr><td style="padding:32px;">
-<h1 style="font-family:'Fredoka',Arial,sans-serif;color:#EA4F26;font-size:24px;margin:0 0 16px;">
+<tr>
+<td style="padding:32px 32px 8px;">
+<h1 style="font-family:'Fredoka', Arial, sans-serif; color:#EA4F26; font-size:24px; margin:0 0 16px;">
 Bonjour {prenom_affiche} !
 </h1>
-<p style="font-size:15px;color:#23242C;line-height:1.6;margin:0 0 24px;">
+<p style="font-size:15px; color:#23242C; line-height:1.6; margin:0 0 24px;">
 Voici la confirmation de tes réservations pour <strong>{type_cours}</strong>,
 le <strong>{jour_nom}</strong> à <strong>{heure_str}</strong> ({freq_label}),
 du <strong>{date_debut}</strong> au <strong>{date_fin}</strong>.
 </p>
-</td></tr>
+</td>
+</tr>
 """
+
     if reserves:
-        rows = "".join(
-            f"""<tr><td style="padding:10px 16px;background-color:#EAF5EC;border-radius:8px;border-bottom:1px solid #FFFFFF;">
-<span style="font-size:14px;color:#23242C;">{r['date']} — {r['jour_nom']} {r['heure_str']}</span><br>
-<a href="{r['ru']}" style="font-size:12px;color:#419958;text-decoration:none;font-weight:600;">↻ Déplacer</a>
+        rows = ""
+        for r in reserves:
+            rows += f"""
+<tr>
+<td style="padding:12px 16px; background-color:#419958; border-bottom:2px solid #FFFFFF;">
+<span style="font-size:14px; color:#FFFFFF; font-weight:600;">{r['date']} — {r['jour_nom']} {r['heure_str']}</span><br>
+<a href="{r['ru']}" style="font-size:12px; color:#FFFFFF; text-decoration:underline;">↻ Déplacer</a>
 &nbsp;&nbsp;
-<a href="{r['cu']}" style="font-size:12px;color:#EA4F26;text-decoration:none;font-weight:600;">✕ Annuler</a>
-</td></tr>
-""" for r in reserves
-        )
+<a href="{r['cu']}" style="font-size:12px; color:#FFFFFF; text-decoration:underline;">✕ Annuler</a>
+</td>
+</tr>
+"""
         html += f"""
 <tr><td style="padding:0 32px;">
-<h2 style="font-family:'Fredoka',Arial,sans-serif;color:#419958;font-size:18px;margin:0 0 12px;">
+<h2 style="font-family:'Fredoka', Arial, sans-serif; color:#419958; font-size:18px; margin:16px 0 12px;">
 ✓ Cours réservés ({len(reserves)})
 </h2>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px; border-radius:8px; overflow:hidden;">
 {rows}
 </table>
 </td></tr>
 """
+
     if en_attente:
-        rows = "".join(
-            f"""<tr><td style="padding:10px 16px;background-color:#FFF3E0;border-radius:8px;border-bottom:1px solid #FFFFFF;">
-<span style="font-size:14px;color:#23242C;">{e['date']} — {e['jour_nom']} {e['heure_str']}</span>
-</td></tr>
-""" for e in en_attente
-        )
+        rows = ""
+        for e in en_attente:
+            rows += f"""
+<tr>
+<td style="padding:12px 16px; background-color:#F8EFE2; border-bottom:2px solid #FFFFFF;">
+<span style="font-size:14px; color:#23242C;">{e['date']} — {e['jour_nom']} {e['heure_str']}</span>
+</td>
+</tr>
+"""
         html += f"""
 <tr><td style="padding:0 32px;">
-<h2 style="font-family:'Fredoka',Arial,sans-serif;color:#C07000;font-size:18px;margin:0 0 12px;">
+<h2 style="font-family:'Fredoka', Arial, sans-serif; color:#23242C; font-size:18px; margin:16px 0 12px;">
 ⏳ En attente de confirmation ({len(en_attente)})
 </h2>
-<p style="font-size:13px;color:#23242C;margin:0 0 12px;">
+<p style="font-size:13px; color:#23242C; margin:0 0 12px;">
 Ces créneaux ne sont pas encore ouverts dans l'agenda de Chloé. Une réservation automatique sera tentée dès qu'ils seront disponibles.
 </p>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px; border-radius:8px; overflow:hidden;">
 {rows}
 </table>
 </td></tr>
 """
+
     if indisponibles:
-        rows = "".join(
-            f"""<tr><td style="padding:10px 16px;background-color:#FBEAEA;border-bottom:1px solid #FFFFFF;">
-<span style="font-size:14px;color:#23242C;">{i['date']} — {i['heure_str']}</span>
-</td></tr>
-""" for i in indisponibles
-        )
+        rows = ""
+        for i in indisponibles:
+            rows += f"""
+<tr>
+<td style="padding:12px 16px; background-color:#EA4F26; border-bottom:2px solid #FFFFFF;">
+<span style="font-size:14px; color:#FFFFFF; font-weight:600;">{i['date']} — {i['heure_str']}</span>
+</td>
+</tr>
+"""
         html += f"""
 <tr><td style="padding:0 32px;">
-<h2 style="font-family:'Fredoka',Arial,sans-serif;color:#EA4F26;font-size:18px;margin:0 0 12px;">
+<h2 style="font-family:'Fredoka', Arial, sans-serif; color:#EA4F26; font-size:18px; margin:16px 0 12px;">
 ✕ Non disponibles ({len(indisponibles)})
 </h2>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px; border-radius:8px; overflow:hidden;">
 {rows}
 </table>
 </td></tr>
 """
+
     html += """
-<tr><td style="padding:0 32px 24px;">
-<p style="font-size:13px;color:#666;line-height:1.5;margin:0;">
+<tr><td style="padding:16px 32px 24px;">
+<p style="font-size:13px; color:#23242C; line-height:1.5; margin:0;">
 Tout cours annulé moins de 48h à l'avance est dû. Pense à utiliser le lien "Déplacer" si tu as besoin de changer un horaire plus de 48h avant.
 </p>
 </td></tr>
 """
+
     html += EMAIL_WRAPPER_CLOSE
     return html
 
 
 def build_email_chloe(nom, email, type_cours, jour_nom, heure_str, freq_label,
-                      date_debut, date_fin, reserves, en_attente, indisponibles, erreurs):
+                       date_debut, date_fin, reserves, en_attente, indisponibles, erreurs):
+
     html = EMAIL_WRAPPER_OPEN.format(logo_url=LOGO_URL)
+
     html += f"""
-<tr><td style="padding:32px;">
-<h1 style="font-family:'Fredoka',Arial,sans-serif;color:#419958;font-size:22px;margin:0 0 16px;">
+<tr>
+<td style="padding:32px 32px 8px;">
+<h1 style="font-family:'Fredoka', Arial, sans-serif; color:#EA4F26; font-size:22px; margin:0 0 16px;">
 Nouvelle demande récurrente
 </h1>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:#23242C;margin-bottom:20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px; color:#23242C; margin-bottom:20px;">
 <tr><td style="padding:4px 0;"><strong>Élève :</strong></td><td style="padding:4px 0;">{nom}</td></tr>
 <tr><td style="padding:4px 0;"><strong>Email :</strong></td><td style="padding:4px 0;">{email}</td></tr>
 <tr><td style="padding:4px 0;"><strong>Cours :</strong></td><td style="padding:4px 0;">{type_cours}</td></tr>
@@ -247,51 +281,55 @@ Nouvelle demande récurrente
 </table>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
 <tr>
-<td align="center" style="background-color:#EAF5EC;border-radius:8px;padding:12px;width:25%;">
-<span style="font-size:20px;font-weight:700;color:#419958;">{len(reserves)}</span><br>
-<span style="font-size:11px;color:#23242C;">réservés</span>
+<td align="center" style="background-color:#419958; border-radius:8px; padding:14px 4px; width:25%;">
+<span style="font-size:20px; font-weight:700; color:#FFFFFF;">{len(reserves)}</span><br>
+<span style="font-size:11px; color:#FFFFFF;">réservés</span>
 </td>
-<td width="8"></td>
-<td align="center" style="background-color:#FFF3E0;border-radius:8px;padding:12px;width:25%;">
-<span style="font-size:20px;font-weight:700;color:#C07000;">{len(en_attente)}</span><br>
-<span style="font-size:11px;color:#23242C;">en attente</span>
+<td width="6"></td>
+<td align="center" style="background-color:#F8EFE2; border:1px solid #23242C; border-radius:8px; padding:14px 4px; width:25%;">
+<span style="font-size:20px; font-weight:700; color:#23242C;">{len(en_attente)}</span><br>
+<span style="font-size:11px; color:#23242C;">en attente</span>
 </td>
-<td width="8"></td>
-<td align="center" style="background-color:#FBEAEA;border-radius:8px;padding:12px;width:25%;">
-<span style="font-size:20px;font-weight:700;color:#EA4F26;">{len(indisponibles)}</span><br>
-<span style="font-size:11px;color:#23242C;">indispo.</span>
+<td width="6"></td>
+<td align="center" style="background-color:#EA4F26; border-radius:8px; padding:14px 4px; width:25%;">
+<span style="font-size:20px; font-weight:700; color:#FFFFFF;">{len(indisponibles)}</span><br>
+<span style="font-size:11px; color:#FFFFFF;">indispo.</span>
 </td>
-<td width="8"></td>
-<td align="center" style="background-color:#FFB7DD;border-radius:8px;padding:12px;width:25%;">
-<span style="font-size:20px;font-weight:700;color:#23242C;">{len(erreurs)}</span><br>
-<span style="font-size:11px;color:#23242C;">erreurs</span>
+<td width="6"></td>
+<td align="center" style="background-color:#23242C; border-radius:8px; padding:14px 4px; width:25%;">
+<span style="font-size:20px; font-weight:700; color:#FFFFFF;">{len(erreurs)}</span><br>
+<span style="font-size:11px; color:#FFFFFF;">erreurs</span>
 </td>
 </tr>
 </table>
-</td></tr>
+</td>
+</tr>
 """
 
-    def _block(title, color, bg, items, line_fn):
+    def _detail_block(title, text_color, bg, fg, items, line_fn):
         if not items:
             return ""
         rows = "".join(
-            f'<tr><td style="padding:6px 12px;background-color:{bg};font-size:13px;color:#23242C;border-bottom:1px solid #FFFFFF;">{line_fn(i)}</td></tr>'
+            f'<tr><td style="padding:8px 12px; background-color:{bg}; font-size:13px; color:{fg}; border-bottom:2px solid #FFFFFF;">{line_fn(i)}</td></tr>'
             for i in items
         )
-        return (f'<tr><td style="padding:0 32px;">'
-                f'<h2 style="font-family:\'Fredoka\',Arial,sans-serif;color:{color};font-size:15px;margin:0 0 8px;">{title}</h2>'
-                f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">{rows}</table>'
-                f'</td></tr>\n')
+        return f"""
+<tr><td style="padding:0 32px;">
+<h2 style="font-family:'Fredoka', Arial, sans-serif; color:{text_color}; font-size:15px; margin:0 0 8px;">{title}</h2>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px; border-radius:6px; overflow:hidden;">{rows}</table>
+</td></tr>
+"""
 
-    html += _block("Réservés", "#419958", "#EAF5EC", reserves,
-                   lambda r: f"{r['date']} — {r['jour_nom']} {r['heure_str']}")
-    html += _block("En attente", "#C07000", "#FFF3E0", en_attente,
-                   lambda e: f"{e['date']} — {e['jour_nom']} {e['heure_str']}")
-    html += _block("Indisponibles", "#EA4F26", "#FBEAEA", indisponibles,
-                   lambda i: f"{i['date']} — {i['heure_str']}")
+    html += _detail_block("Réservés", "#419958", "#419958", "#FFFFFF", reserves,
+                           lambda r: f"{r['date']} — {r['jour_nom']} {r['heure_str']}")
+    html += _detail_block("En attente", "#23242C", "#F8EFE2", "#23242C", en_attente,
+                           lambda e: f"{e['date']} — {e['jour_nom']} {e['heure_str']}")
+    html += _detail_block("Indisponibles", "#EA4F26", "#EA4F26", "#FFFFFF", indisponibles,
+                           lambda i: f"{i['date']} — {i['heure_str']}")
     if erreurs:
-        html += _block("Erreurs", "#23242C", "#FFB7DD", erreurs,
-                       lambda e: f"{e.get('date', '?')} — {e.get('r', 'erreur inconnue')}")
+        html += _detail_block("Erreurs", "#23242C", "#23242C", "#FFFFFF", erreurs,
+                               lambda e: f"{e.get('date','?')} — {e.get('r','erreur inconnue')}")
+
     html += EMAIL_WRAPPER_CLOSE
     return html
 
@@ -588,7 +626,7 @@ def check_and_book(event_type_uri: str, location: dict, dt_utc: datetime,
 def send_email(to_addr, subject, html_body, cc=None):
     msg            = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"]    = SMTP_FROM
+    msg["From"]    = f"{str(Header('Chloé Ludmann', 'utf-8'))} <{SMTP_FROM}>"
     msg["To"]      = to_addr
     if cc:
         msg["Cc"] = cc
