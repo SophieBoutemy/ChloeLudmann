@@ -134,7 +134,7 @@ EMAIL_WRAPPER_OPEN = """
 <!-- HEADER : fond noir, texte/logo en blanc -->
 <tr>
 <td style="background-color:#23242C; padding:24px 32px; text-align:center;">
-<img src="{logo_url}" alt="Chloé Ludmann" style="height:44px;">
+<img src="{logo_url}" alt="Chloé Ludmann" style="height:44px; color:#FFFFFF; font-family:Arial, sans-serif;">
 </td>
 </tr>
 """
