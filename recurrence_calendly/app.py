@@ -645,7 +645,7 @@ def tally_webhook():
     fin_str      = resolve_field(d, "date de fin", "date de fin de la période",
                                  "date de fin de la periode", "fin", "date fin")
     frequence_str = resolve_field(d, "fréquence", "frequence", "fréquence de cours",
-                                  "fréquence des cours").lower().strip()
+                                  "fréquence des cours", "type de semaines").lower().strip()
     if "impaire" in frequence_str:
         frequence = FREQ_IMPAIRE
     elif "paire" in frequence_str:
