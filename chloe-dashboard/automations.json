@@ -59,10 +59,34 @@
     "agent": "Suivi Élèves"
   },
   {
+    "id": "resume_mails",
+    "icon": "✉️",
+    "name": "Résumé des mails",
+    "description": "Synthèse IA des emails clients reçus dans la journée",
+    "trigger": "cron",
+    "frequency": "1× par jour à 19h30",
+    "script": "imap_to_notion_chloe.py",
+    "log": "/home/ubuntu/automations/logs/imap_to_notion_chloe.log",
+    "stale_after_hours": 25,
+    "agent": "Suivi Élèves"
+  },
+  {
+    "id": "fiche_client",
+    "icon": "👤",
+    "name": "Fiche individuelle client",
+    "description": "Génération et mise à jour des fiches élèves dans Notion",
+    "trigger": "cron",
+    "frequency": "1× par jour à 19h30",
+    "script": "imap_to_notion_chloe.py",
+    "log": "/home/ubuntu/automations/logs/imap_to_notion_chloe.log",
+    "stale_after_hours": 25,
+    "agent": "Suivi Élèves"
+  },
+  {
     "id": "factures_cron",
     "icon": "🧾",
-    "name": "Scan des factures",
-    "description": "Détection des factures dans les boîtes mail IMAP, upload sur Drive et création des entrées Notion",
+    "name": "Recupere les factures dans les boites mail et les envoie dans le Drive",
+    "description": "Recupere les factures dans les boites mail et les envoie dans le Drive",
     "trigger": "cron",
     "frequency": "lundis à 8h",
     "script": "factures/factures.py",
@@ -79,13 +103,13 @@
     "service": "factures-app.service",
     "frequency": "Service permanent (port 5004)",
     "script": "factures/app.py",
-    "agent": "Factures"
+    "agent": "_hidden"
   },
   {
     "id": "liste_attente",
     "icon": "📋",
-    "name": "Webhook Tally-Calendly",
-    "description": "Webhook Tally et Calendly — gestion de la liste d'attente et notifications automatiques",
+    "name": "Notification creneau annule",
+    "description": "Inscription en liste d'attente pour recevoir une proposition de creneau annule",
     "trigger": "systemd",
     "service": "liste-attente.service",
     "frequency": "Service permanent (port 5002)",
@@ -95,8 +119,8 @@
   {
     "id": "recurrence_webhook",
     "icon": "🗓️",
-    "name": "Webhook réservations récurrentes",
-    "description": "Reçoit les soumissions du formulaire Tally et crée les réservations Calendly hebdomadaires",
+    "name": "Reservation cours regulier",
+    "description": "Reservation de cours de chant regulier via formulaire",
     "trigger": "systemd",
     "service": "recurrence-calendly.service",
     "frequency": "Service permanent (port 5007)",
@@ -113,6 +137,18 @@
     "script": "recurrence_calendly/retry.py",
     "log": "/home/ubuntu/automations/logs/recurrence_retry.log",
     "stale_after_hours": 25,
-    "agent": "Cours récurrents"
+    "agent": "_hidden"
+  },
+  {
+    "id": "prospection",
+    "icon": "🔍",
+    "name": "Adjoint Prospection",
+    "description": "Recherche d'entreprises par secteur et département, enrichissement automatique (site web, email), gestion des contacts avec statuts et notes, génération d'emails personnalisés par IA.",
+    "trigger": "systemd",
+    "service": "chloe-dashboard.service",
+    "frequency": "Service permanent (port 5005)",
+    "script": "chloe-dashboard/app.py",
+    "agent": "Prospection",
+    "url": "/prospection"
   }
 ]

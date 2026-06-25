@@ -69,28 +69,46 @@ def tally_webhook():
 def calendly_webhook():
     body  = request.get_json(silent=True) or {}
     event = body.get("event", "")
+    print(f"[calendly] Webhook recu: {body}")
 
     if event != "invitee.canceled":
         return jsonify({"status": "ignored"}), 200
 
-    waitlist = load_waitlist()
-    if not waitlist:
-        return jsonify({"status": "waitlist_empty"}), 200
+    try:
+        waitlist = load_waitlist()
+        if not waitlist:
+            return jsonify({"status": "waitlist_empty"}), 200
 
-    payload        = body.get("payload", {})
-    event_name     = payload.get("event_type", {}).get("name", "")
-    scheduled      = payload.get("scheduled_event", {})
-    start_time     = scheduled.get("start_time", "")
-    end_time       = scheduled.get("end_time", "")
-    scheduling_url = (payload.get("scheduling_url", "")
-                      or scheduled.get("scheduling_url", "")
-                      or payload.get("event", {}).get("scheduling_url", ""))
+        payload        = body.get("payload", {})
+        event_name     = payload.get("event_type", {}).get("name", "")
+        event_uri      = payload.get("event", "")
+        event_uuid     = event_uri.rstrip("/").split("/")[-1] if event_uri else ""
+        start_time     = ""
+        end_time       = ""
+        if event_uuid:
+            import urllib.request as _ur, json as _json, os as _os
+            _req = _ur.Request(
+                f"https://api.calendly.com/scheduled_events/{event_uuid}",
+                headers={"Authorization": f"Bearer {_os.getenv('CALENDLY_TOKEN', '')}"}
+            )
+            try:
+                with _ur.urlopen(_req) as _r:
+                    _ev = _json.loads(_r.read())["resource"]
+                    start_time = _ev.get("start_time", "")
+                    end_time   = _ev.get("end_time", "")
+            except Exception as _e:
+                print(f"[calendly] WARNING recuperation evenement {event_uuid}: {_e}")
+        scheduling_url = payload.get("invitee", {}).get("reschedule_url", "")
 
-    print(f"[calendly] Annulation détectée — {len(waitlist)} personne(s) à notifier")
-    notifier.notify_all(waitlist, event_name=event_name, start_time=start_time, end_time=end_time, booking_url=scheduling_url)
+        print(f"[calendly] Annulation détectée — {len(waitlist)} personne(s) à notifier")
+        notifier.notify_all(waitlist, event_name=event_name, start_time=start_time, end_time=end_time, booking_url=scheduling_url)
 
-    save_waitlist([])
-    return jsonify({"status": "notified", "count": len(waitlist)}), 200
+        save_waitlist([])
+        return jsonify({"status": "notified", "count": len(waitlist)}), 200
+    except Exception as exc:
+        import traceback
+        print(f"[calendly] ERROR traitement webhook: {exc}")
+        return jsonify({"status": "error", "detail": str(exc)}), 200
 
 
 @app.route("/unsubscribe", methods=["GET"])

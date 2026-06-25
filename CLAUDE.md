@@ -1,41 +1,38 @@
-﻿# Infrastructure ? Chlo? Ludmann Automations
+# Infrastructure VPS — Automations Sophie Boutemy
 
-## VPS
+VPS OVH partagé entre deux projets : les automatisations de **Chloé Ludmann** et le **dashboard personnel Sophie**. Tout tourne sur le même serveur, avec des services systemd distincts par module.
 
 - **IP** : 83.228.240.50
 - **User** : ubuntu
 - **Connexion** : `ssh -i "C:\Users\sophi\cle-automations" ubuntu@83.228.240.50`
-- **R?pertoire principal** : `/home/ubuntu/automations/`
-- **venv** : `/home/ubuntu/automations/venv/`
-- **Fichier de config** : `/home/ubuntu/automations/.env` (toutes les cl?s et mots de passe)
+- **Répertoire principal** : `/home/ubuntu/automations/`
+- **Fichier .env** : `/home/ubuntu/automations/.env` (toutes les clés et mots de passe, partagé entre les deux projets)
+
+---
 
 ## Domaines & Nginx
 
 | Domaine | Usage |
 |---|---|
-| `automations.chloeludmann.fr` | Reverse proxy principal (HTTPS, Let's Encrypt) |
+| `automations.chloeludmann.fr` | Reverse proxy principal — services de Chloé (HTTPS, Let's Encrypt) |
+| `automations.chloeludmann.fr/dashboard/` | Dashboard Chloé (port 5005) |
 | `mon-adjoint-ia.fr` | Site statique `/var/www/mon-adjoint-ia` |
 | `pro.mon-adjoint-ia.fr` | Dashboard Sophie (port 5006) |
 
-Nginx config : `/etc/nginx/sites-enabled/`
-
-## GitHub
-
-- **Repo** : `https://github.com/lapetitefabriquedigitale/ChloeLudmann.git`
-- **Branche** : `main`
-- **Remote** : configur? avec token HTTPS dans l'URL (dans le remote git local)
-- **Backup auto** : commit hebdomadaire via cron (`weekly_backup.py`)
+Nginx configs : `/etc/nginx/sites-enabled/`
 
 ---
 
-## Services systemd (toujours actifs)
+## Services systemd
 
 | Service | Fichier | Port | URL publique |
 |---|---|---|---|
-| `chloe-dashboard.service` | `chloe-dashboard/app.py` | 5005 | `/dashboard/` |
-| `factures-app.service` | `factures/app.py` | 5004 | `/scan-factures` |
-| `liste-attente.service` | `liste_attente/app.py` | 5002 | `/` (racine domaine) |
-| `sophie-dashboard.service` | `/home/ubuntu/sophie-dashboard/app.py` | 5006 | `pro.mon-adjoint-ia.fr` |
+| `chloe-dashboard.service` | `automations/chloe-dashboard/app.py` | 5005 | `automations.chloeludmann.fr/dashboard/` |
+| `factures-app.service` | `automations/factures/app.py` | 5004 | `/scan-factures` |
+| `liste-attente.service` | `automations/liste_attente/app.py` | 5002 | `/` (racine domaine) |
+| `recurrence-calendly.service` | `automations/recurrence_calendly/app.py` | 5007 | `/recurrence-webhook` |
+| `export-eleves.service` | `automations/export_excel/app.py` | 5003 | `/export-eleves` |
+| `sophie-dashboard.service` | `sophie-dashboard/app.py` | 5006 | `pro.mon-adjoint-ia.fr` |
 
 Commandes utiles :
 ```bash
@@ -44,195 +41,288 @@ sudo systemctl restart <service>
 sudo journalctl -u <service> -n 50
 ```
 
-L'app `export_excel/app.py` (port 5003, route `/export-eleves`) n'a pas de service systemd ? ? v?rifier si elle est lanc?e manuellement.
+---
+
+## Crons (user ubuntu)
+
+| Script | Fréquence | Rôle |
+|---|---|---|
+| `imap_to_notion_chloe.py` | Tous les jours à 19h30 | Lecture IMAP, classification Claude, écriture Notion |
+| `daily_summary.py` | Tous les jours à 20h | Résumé des 24h par email |
+| `docage_to_notion.py` | Lun, mer, ven à 8h | Sync signatures Docage → Notion |
+| `factures/factures.py` | Lundis à 8h | Récupère factures IMAP → Drive |
+| `liste_attente/monitor.py` | Tous les jours à 7h | Vérifie que le webhook Calendly est actif |
+| `recurrence_calendly/retry.py` | Tous les jours à 7h | Relance les créneaux Calendly en attente |
+| `weekly_backup.py` | Dimanches à 20h | Export JSON base Notion élèves |
+| `backup_complet.sh` | Dimanches à 21h | Backup complet VPS |
 
 ---
 
-## Automatisations (crons)
+## GitHub
 
-7 t?ches planifi?es dans `crontab -l` pour l'user `ubuntu`.
-
-### 1. `imap_to_notion_chloe.py`
-- **Cron** : tous les jours ? 19h30
-- **R?le** : Lit les bo?tes IMAP de Chlo? (OVH + Infomaniak), classe les emails via Claude (Haiku), cr?e des entr?es dans la base Notion ?v?nements
-- **Comptes lus** : `IMAP_EMAIL` (contact@chloeludmann.fr) + `IMAP_EMAIL_WHISPER` (contact@whisper-in-the-rennes.fr)
-- **Log** : `logs/imap_to_notion_chloe.log`
-
-### 2. `daily_summary.py`
-- **Cron** : tous les jours ? 20h
-- **R?le** : R?cup?re les ?v?nements Notion des 24h pass?es, g?n?re un r?sum? HTML via Claude, l'envoie par email (SMTP Gmail)
-- **Destinataires** : contact@chloeludmann.fr + bour.chloe0@gmail.com
-- **Log** : `logs/daily_summary.log`
-
-### 3. `docage_to_notion.py`
-- **Cron** : lundi, mercredi, vendredi ? 8h
-- **R?le** : Synchronise les transactions de signature Docage vers Notion (base ?v?nements). Option `--resend` pour relancer les contrats bloqu?s ? "Relanc?"
-- **Log** : `logs/docage_to_notion.log`
-
-### 4. `factures/factures.py`
-- **Cron** : lundi ? 8h
-- **R?le** : Scan des factures depuis Google Drive, traitement et mise ? jour Notion
-- **Log** : `logs/factures.log`
-
-### 5. `liste_attente/monitor.py`
-- **Cron** : tous les jours ? 7h
-- **R?le** : V?rifie que le webhook Calendly est actif et que le SMTP fonctionne. Envoie une alerte ? contact@sophieboutemy.com en cas d'?chec
-- **Log** : `logs/monitor.log`
-
-### 6. `weekly_backup.py`
-- **Cron** : dimanche ? 20h
-- **R?le** : Export JSON de la base Notion ?l?ves vers `backups/backup_eleves_YYYY-MM-DD.json`. Nettoyage des backups de plus de 30 jours
-- **Log** : `logs/weekly_backup.log`
-
-### 7. `backup_complet.sh`
-- **Cron** : dimanche ? 21h
-- **R?le** : Backup complet du VPS (script shell)
-- **Log** : `logs/backup_complet.log`
+- **Repo Chloé** : `https://github.com/lapetitefabriquedigitale/ChloeLudmann.git`
+- **Repo Sophie** : `https://github.com/lapetitefabriquedigitale/MonEspacePro.git`
+- **Branche** : `main` (les deux)
+- **Remotes** : configurés avec token HTTPS dans l'URL (remote git local)
+- **Backup auto** : commit hebdomadaire via cron (dimanche 21h, `backup_complet.sh`)
 
 ---
 
-## Bases Notion utilis?es
+## Bases Notion utilisées
 
 | Base | ID | Usage |
 |---|---|---|
-| ?l?ves / ?v?nements | `35eafa74cfc980d092d0e80644bd6be7` | Base principale ? emails entrants, r?sum?s, backups, Docage |
-| Factures | `327afa74cfc980328301eec9bb7996e5` | Suivi factures (dashboard + scan) |
+| Élèves / Événements | `35eafa74cfc980d092d0e80644bd6be7` | Base principale — emails, résumés, backups, Docage |
+| Factures | `327afa74cfc980328301eec9bb7996e5` | Adjoint Factures |
 | Import BTP | `318afa74cfc981148528e6791c72f1cc` | Import ponctuel (`import_notion_btp.py`) |
-| `NOTION_DATABASE_ID` | (voir .env) | Script legacy `gmail_to_notion.py` |
 
 ---
 
 ## Variables d'environnement (.env)
 
-Toutes les valeurs r?elles sont dans `/home/ubuntu/automations/.env`. Ne jamais les committer.
+Fichier : `/home/ubuntu/automations/.env`. Ne jamais committer les valeurs.
 
 | Variable | Usage |
 |---|---|
-| `ANTHROPIC_API_KEY` | API Claude ? classification emails et g?n?ration de r?sum?s |
-| `NOTION_API_KEY` | Acc?s API Notion ? toutes les automatisations |
+| `ANTHROPIC_API_KEY` | API Claude — classification emails et résumés |
+| `NOTION_API_KEY` | Accès API Notion |
 | `NOTION_DATABASE_ID` | ID base Notion (script legacy `gmail_to_notion.py`) |
-| `IMAP_EMAIL` | Adresse bo?te OVH de Chlo? (contact@chloeludmann.fr) |
+| `IMAP_EMAIL` | contact@chloeludmann.fr (OVH) |
 | `IMAP_PASSWORD` | Mot de passe IMAP OVH |
-| `IMAP_EMAIL_WHISPER` | Adresse bo?te Infomaniak Whisper |
+| `IMAP_EMAIL_WHISPER` | contact@whisper-in-the-rennes.fr (Infomaniak) |
 | `IMAP_PASSWORD_WHISPER` | Mot de passe IMAP Infomaniak |
-| `GMAIL_IMAP_EMAIL` | Email Gmail (lecture IMAP) |
-| `GMAIL_AUTOMATION_PASSWORD` | App password Gmail pour envoi SMTP (boutemy.automatisation@gmail.com) |
+| `GMAIL_AUTOMATION_PASSWORD` | App password Gmail SMTP (boutemy.automatisation@gmail.com) |
 | `SMTP_PASS` | Mot de passe SMTP (alias ou usage futur) |
 | `DOCAGE_EMAIL` | Email du compte Docage |
-| `DOCAGE_API_KEY` | Cl? API Docage (signatures ?lectroniques) |
+| `DOCAGE_API_KEY` | Clé API Docage (signatures électroniques) |
 | `CALENDLY_TOKEN` | Token API Calendly |
-| `CALENDLY_URL` | URL du profil Calendly de Chlo? |
+| `CALENDLY_URL` | URL du profil Calendly de Chloé |
 | `DRIVE_FOLDER_ID` | ID du dossier Google Drive (factures) |
 | `DRIVE_FACTURES_URL` | URL du dossier Drive factures |
-| `DASHBOARD_USER` | Login admin du dashboard Chlo? |
-| `DASHBOARD_PASSWORD` | Mot de passe admin du dashboard Chlo? |
-| `DASHBOARD_SECRET_KEY` | Cl? secr?te Flask session (chloe-dashboard) |
-| `DASHBOARD_USER_EMAIL` | Email de l'admin du dashboard |
+| `DASHBOARD_USER` | Login admin dashboard Chloé |
+| `DASHBOARD_PASSWORD` | Mot de passe admin dashboard Chloé |
+| `DASHBOARD_SECRET_KEY` | Clé secrète Flask (chloe-dashboard) |
+| `DASHBOARD_USER_EMAIL` | Email admin dashboard Chloé |
 | `SOPHIE_DASHBOARD_USER` | Login admin Mon Espace Pro |
 | `SOPHIE_DASHBOARD_PASSWORD` | Mot de passe admin Mon Espace Pro |
 | `SOPHIE_DASHBOARD_EMAIL` | Email admin Mon Espace Pro |
-| `SOPHIE_DASHBOARD_SECRET_KEY` | Cl? secr?te Flask session (sophie-dashboard) |
+| `SOPHIE_DASHBOARD_SECRET_KEY` | Clé secrète Flask (sophie-dashboard) |
 | `VPS_URL` | URL publique du VPS |
 
 ---
 
-## Calendly ? Planning de Chlo?
+---
 
-**Schedule actif** : "Sept 2026 > Juillet 2027" (default=True), timezone Europe/Berlin.
+# Automatisations — Projet Chloé Ludmann
 
-### R?gles de base (wday)
+Dashboard : `https://automations.chloeludmann.fr/dashboard/`
+Répertoire : `/home/ubuntu/automations/`
 
-Lundi ? vendredi ouverts **09h00?20h00** sans exception. Samedi et dimanche ferm?s.  
-Aucun jour de semaine n'est ferm? par d?faut ? le planning de base couvre les 5 jours.
+---
 
-### Gestion des disponibilit?s r?elles
+## Adjoint Client
 
-Chlo? ne se base pas sur la r?gle wday pour ses journ?es r?elles : elle pose des exceptions `type=date` individuelles sur chaque jour travaill? (horaires pr?cis, souvent 14h?18h30 ou 09h?13h30). La r?gle wday 09h?20h sert de filet de s?curit?, mais en pratique presque chaque jour a sa propre exception.
+**Ce qu'il fait** : surveille les boîtes mail de Chloé, classe les emails entrants via Claude (annulations, demandes d'inscription, rattrapages), crée des entrées dans la base Notion Élèves, génère un résumé quotidien et synchronise les statuts de contrats Docage.
 
-**Ce comportement est intentionnel ? c'est le vrai planning de Chlo?, pas un bug ? corriger.** Ne pas "normaliser" les exceptions `type=date` vers la r?gle wday.
+**Dashboard** : `automations.chloeludmann.fr/dashboard/` — bloc "Adjoint Client"
 
-### Vacances / fermetures connues (v?rifi?es via API)
+**Outils connectés** : IMAP OVH (`contact@chloeludmann.fr`) + IMAP Infomaniak (`contact@whisper-in-the-rennes.fr`), Claude AI (classification), Notion (base Élèves `35eafa74`), Docage (API signatures), Gmail SMTP (envoi résumés)
 
-Les vacances sont des exceptions `type=date` avec `intervals=[]` qui ?crasent la r?gle wday.
+**Actions affichées dans le dashboard** :
 
-| P?riode | Dates |
+| Action | Type | Fréquence | Script |
+|---|---|---|---|
+| Surveillance des boîtes mail | cron | Tous les jours à 19h30 | `imap_to_notion_chloe.py` |
+| Synchronisation Docage | cron | Lun, mer, ven à 8h | `docage_to_notion.py` |
+| Résumé quotidien | cron | Tous les jours à 20h | `daily_summary.py` |
+| Backup Notion | cron | Dimanches à 20h | `weekly_backup.py` |
+| Export Excel | systemd | Service permanent (port 5003) | `export_excel/app.py` |
+| Résumé des mails | cron | Tous les jours à 19h30 | `imap_to_notion_chloe.py` |
+| Fiche individuelle client | cron | Tous les jours à 19h30 | `imap_to_notion_chloe.py` |
+
+**Logs** : `logs/imap_to_notion_chloe.log`, `logs/docage_to_notion.log`, `logs/daily_summary.log`, `logs/weekly_backup.log`
+
+---
+
+## Adjoint Factures
+
+**Ce qu'il fait** : récupère les factures reçues dans les boîtes mail IMAP, les upload sur Google Drive et crée les entrées correspondantes dans la base Notion Factures.
+
+**Dashboard** : `automations.chloeludmann.fr/dashboard/` — bloc "Adjoint Factures"
+
+**Outils connectés** : IMAP OVH, Google Drive (dossier `1K3IRH_GEbXjDFZELfsYUNI78OaykghzY`), Notion (base Factures `327afa74`)
+
+**Services** :
+
+| Action | Type | Fréquence | Service / Script |
+|---|---|---|---|
+| Récupère les factures dans les boîtes mail et les envoie dans le Drive | cron | Lundis à 8h | `factures/factures.py` |
+| Interface scan (interne, non affiché) | systemd | Permanent (port 5004) | `factures-app.service` |
+
+**Log** : `logs/factures.log`
+
+**Note** : le token Google OAuth (`token.json`) n'a actuellement que le scope `gmail.readonly` — le scope `drive.file` doit être ajouté pour que l'upload Drive fonctionne. Voir `reauth_drive.py`.
+
+---
+
+## Adjoint Attente
+
+**Ce qu'il fait** : gère la liste d'attente de Chloé. Quand un élève s'inscrit via le formulaire Tally, il est ajouté à la liste. Quand une annulation Calendly arrive via webhook, tous les inscrits reçoivent un email de proposition de créneau.
+
+**Dashboard** : `automations.chloeludmann.fr/dashboard/` — bloc "Adjoint Attente"
+
+**Outils connectés** : Tally (formulaire `obBLae`, webhook `/tally`), Calendly (webhook annulation `/calendly`), Gmail SMTP
+
+**Service** : `liste-attente.service` — port 5002, permanent
+
+**Endpoints** :
+- `POST /tally` — reçoit les inscriptions Tally
+- `POST /calendly` — reçoit les annulations Calendly (`invitee.canceled`)
+- `GET /unsubscribe` — désabonnement liste
+
+**Fichiers clés** :
+- `liste_attente/app.py` — webhook principal
+- `liste_attente/notifier.py` — envoi emails aux inscrits
+- `liste_attente/waitlist.json` — liste d'attente persistée
+- `liste_attente/monitor.py` — cron quotidien 7h, vérifie que le webhook est actif
+
+**Webhook Calendly enregistré** : `dfb337a4-9e69-46cb-8f56-fcdc3ec68a3b`
+
+**Log** : `logs/liste_attente.log`, `logs/monitor.log`
+
+**État** : le webhook `/calendly` crashait avec `AttributeError` (structure payload Calendly mal parsée). Corrigé : `payload["event"]` est une string URI (pas un dict) ; `start_time`/`end_time` sont récupérés via `GET /scheduled_events/{uuid}` ; `scheduling_url` depuis `payload["invitee"]["reschedule_url"]`. Try/except global ajouté.
+
+---
+
+## Adjoint Social
+
+**Ce qu'il fait** : génère des contenus réseaux sociaux et newsletter via IA à partir d'un brief texte (Instagram, Facebook, LinkedIn, Newsletter), avec historique et édition inline.
+
+**Dashboard** : `automations.chloeludmann.fr/dashboard/` — bloc "Adjoint Social"
+
+**État** : module non encore déployé (bouton désactivé dans le dashboard). Route `/brief_to_post` prévue.
+
+**Outils prévus** : Claude AI (génération de contenu)
+
+---
+
+## Adjoint Planning
+
+**Ce qu'il fait** : reçoit les soumissions du formulaire Tally de réservation de cours récurrents, crée automatiquement les réservations Calendly pour toute la saison (hebdomadaires ou bi-hebdomadaires), et gère un mécanisme de retry pour les créneaux encore hors de la fenêtre de 60 jours Calendly.
+
+**Dashboard** : `automations.chloeludmann.fr/dashboard/` — bloc "Adjoint Planning"
+
+**Outils connectés** : Tally (formulaire `VLqbG6`, webhook `/recurrence-webhook`), Calendly (API `/scheduled_events`, `/invitees`), Gmail SMTP (confirmation élève + notification Chloé)
+
+**Services** :
+
+| Action | Type | Fréquence | Service / Script |
+|---|---|---|---|
+| Réservation cours régulier | systemd | Permanent (port 5007) | `recurrence-calendly.service` |
+| Retry créneaux (interne, non affiché) | cron | Tous les jours à 7h | `recurrence_calendly/retry.py` |
+
+**Endpoints** :
+- `POST /recurrence-webhook` — reçoit les soumissions Tally
+- `GET /recurrence-webhook/health` — healthcheck
+
+**Fichiers clés** :
+- `recurrence_calendly/app.py` — traitement Tally + réservation Calendly
+- `recurrence_calendly/retry.py` — relance quotidienne des créneaux en attente
+- `recurrence_calendly/pending.db` — SQLite des créneaux en attente
+
+**Idempotence** : `processed_forms.json` (côté `recurrence_calendly/`) enregistre les `responseId` Tally déjà traités pour éviter les doubles envois en cas de retry Tally.
+
+**Log** : `logs/recurrence_calendly.log`, `logs/recurrence_retry.log`
+
+**Logique `check_and_book`** :
+- Appelle toujours `GET /event_type_available_times` en premier
+- Si liste vide → statut `unavailable` directement (plus de logique "pending automatique")
+- `WINDOW_DAYS=365` dans `.env` — conservé mais ne sert plus à classifier une réponse vide
+
+**Fréquence paire/impaire** : le champ Tally "Type de semaines" (paires / impaires / toutes) est lu à l'entrée et converti en filtre de semaine avant d'interroger Calendly.
+
+**SMTP** : Gmail SMTP via `boutemy.automatisation@gmail.com` (app password `GMAIL_AUTOMATION_PASSWORD`). OVH abandonné (relay silencieux). Brevo en attente d'activation.
+
+**Charte email** :
+
+| Rôle | Hex |
 |---|---|
-| ?t? 2026 | 4 ao?t ? 28 ao?t 2026 (1er ao?t encore ouvert, 31 ao?t r?ouverture) |
-| Toussaint 2026 | 26, 27, 28, 29, 30 oct 2026 ? 5 exceptions `type=date intervals=[]` individuelles, toute la semaine ferm?e. |
-| No?l 2026 | 20 d?c ? 31 d?c 2026 |
-| Carnaval/hiver 2027 | 1er mars ? 5 mars 2027 |
-| Ascension 2027 | 9 mai ? 22 mai 2027 |
-| ?t? 2027 | ? partir du 3 ao?t 2027 |
-
-### Source de v?rit? pour les cr?neaux
-
-`GET /event_type_available_times` est la seule source fiable pour savoir si un cr?neau est r?servable. Le schedule donne le contexte (vacances, horaires), mais l'API retourne l'?tat r?el apr?s fusion des r?gles, exceptions, et r?servations existantes.
-
-### Types de rules disponibles dans l'API
-
-L'endpoint `GET /user_availability_schedules` ne retourne que deux types de rules :
-- `wday` ? r?gle r?currente par jour de semaine (7 entr?es : lun?dim)
-- `date` ? exception sur une date pr?cise (329 entr?es sur le schedule actuel)
-
-Il n'existe pas de type `range` ou `date_range` dans cet endpoint. Les fermetures multi-jours (vacances) sont toujours des exceptions `type=date` individuelles, une par jour.
-
-### Plage de r?servation des event types cours r?guliers
-
-Les 4 event types de cours r?guliers (#15-18) sont configur?s sur **"Ind?finiment"** (pas de date limite fixe). Ne pas remettre de limite de date ? c'est voulu pour que les ?l?ves puissent r?server sur toute la saison disponible.
+| Vert principal (boutons) | `#419958` |
+| Rouge / alerte | `#EA4F26` |
+| Rose (accents doux) | `#FFB7DD` |
+| Beige fond | `#F8EFE2` |
+| Noir texte | `#23242C` |
 
 ---
 
-## `recurrence_calendly` ? Logique et ?tat (mis ? jour 2026-06-23)
+## Calendly — Planning de Chloé
 
-Dossier : `~/automations/recurrence_calendly/`
+**Schedule actif** : "Sept 2026 > Juillet 2027" (`4c8a3ac0-cffd-47b1-a9e4-afaf57bbee6a`), timezone Europe/Berlin.
 
-### Logique `check_and_book`
+**Règles de base (wday)** : lundi–samedi ouverts 09h00–20h00. Dimanche fermé. En pratique, presque chaque jour a sa propre exception `type=date` avec des horaires précis (14h–18h30 ou 09h–13h30) — c'est le vrai planning de Chloé, pas un bug.
 
-- `check_and_book()` appelle **toujours** `GET /event_type_available_times` en premier.
-- Si l'API retourne une liste vide ? statut `unavailable` directement. **Il n'y a plus de logique "pending automatique pour les dates lointaines"** (supprim?e).
-- Exception : une race condition est possible au moment exact du booking (cr?neau pris entre le check et la r?servation) ? dans ce cas seulement, le pending peut appara?tre transitoirement.
-- `WINDOW_DAYS=365` dans `.env` ? conserv? mais ne sert plus ? classifier une r?ponse vide.
+**Vacances connues** :
 
-### Fr?quence paire/impaire
+| Période | Dates |
+|---|---|
+| Été 2026 | 4 août – 28 août 2026 |
+| Toussaint 2026 | 26–30 oct 2026 |
+| Noël 2026 | 20–31 déc 2026 |
+| Carnaval 2027 | 1er–5 mars 2027 |
+| Ascension 2027 | 9–22 mai 2027 |
+| Été 2027 | À partir du 3 août 2027 |
 
-- Le champ Tally **"Type de semaines"** (semaines paires / impaires / toutes) est lu ? l'entr?e du formulaire.
-- Mappage r?alis? dans `resolve_field()` : la valeur Tally est convertie en filtre de semaine avant d'interroger les cr?neaux.
-- Ne pas modifier cette logique sans v?rifier la concordance avec les intitul?s exacts des options Tally.
+**Source de vérité** : `GET /event_type_available_times` — seule source fiable pour les créneaux réservables.
 
-### SMTP ? situation actuelle (? r?soudre)
+**Event types cours réguliers** : configurés sur "Indéfiniment" (pas de date limite). Ne pas remettre de limite.
 
-**Solution temporaire en production** : Gmail SMTP via `boutemy.automatisation@gmail.com` (app password `GMAIL_AUTOMATION_PASSWORD`). Le champ `From` affich? est "Chlo? Ludmann" ? fonctionne en d?livrabilit?.
+---
 
-**Pistes test?es et abandonn?es** :
-- **OVH** : le relay SMTP accepte la connexion mais les emails ne sont jamais d?livr?s (pas d'erreur, pas d'accus? ? silencieux). Abandonn?.
-- **Brevo** : compte existant mais le SMTP transactionnel n'a jamais ?t? activ? (n?cessite un ticket support Brevo). Mis en attente.
+---
 
-**? faire** : ouvrir un ticket Brevo pour activer le SMTP transactionnel, puis migrer depuis Gmail. Ne pas retenter OVH.
+# Automatisations — Projet Sophie (Mon Espace Pro)
 
-### Templates email ? charte graphique
+Dashboard : `https://pro.mon-adjoint-ia.fr/`
+Répertoire : `/home/ubuntu/sophie-dashboard/`
+Service : `sophie-dashboard.service` — port 5006
 
-`build_email_client()` et `build_email_chloe()` utilisent **strictement** la palette suivante ? ne pas inventer d'autres teintes :
+---
 
-| R?le | Couleur | Hex |
+## Adjoint Prospection
+
+**Ce qu'il fait** : recherche d'entreprises par codes NAF et département via l'API Annuaire Entreprises (données ouvertes), enrichissement automatique (site web + email par scraping BeautifulSoup4), gestion d'une base de contacts avec statuts, notes, export CSV.
+
+**Dashboard** : `pro.mon-adjoint-ia.fr` — module "Adjoint Prospection"
+
+**Outils connectés** : API Annuaire Entreprises (sans clé), BeautifulSoup4 (scraping), SQLite (`prospection/contacts.db`)
+
+**Routes principales** :
+
+| Méthode | Route | Description |
 |---|---|---|
-| Vert principal | `#419958` | Boutons, accents |
-| Rouge / alerte | `#EA4F26` | Annulations, urgences |
-| Rose | `#FFB7DD` | Accents doux |
-| Beige fond | `#F8EFE2` | Fond des emails |
-| Noir texte | `#23242C` | Corps de texte |
+| GET | `/prospection` | Page principale — stats, tâche en cours, formulaire |
+| POST | `/prospection/run` | Lance une recherche (codes NAF, départements, max résultats) |
+| GET | `/prospection/status` | JSON — état de la tâche en cours (polling toutes les 2s) |
+| GET | `/prospection/contacts` | Liste des contacts filtrée et paginée (50/page) |
+| GET | `/prospection/contacts/export.csv` | Export CSV |
+| POST | `/prospection/contacts/delete` | Suppression par IDs |
+| PATCH | `/prospection/contacts/<id>` | Mise à jour inline (statut, notes) |
 
-`color-scheme: light` est forc? dans les styles inline pour ?viter que les clients mail (Gmail app, Apple Mail dark mode) n'inversent les couleurs.
+**Fichiers clés** :
+- `app.py` — Flask principal (port 5006)
+- `config.json` — agents IA et clients (données du tableau de bord)
+- `prospection/scraper.py` — API Annuaire Entreprises
+- `prospection/enricher.py` — enrichissement site + email
+- `prospection/storage.py` — CRUD SQLite
+- `prospection/runner.py` — thread background + `task_status.json`
+- `prospection/contacts.db` — base SQLite des contacts
 
----
+**Statuts contacts** : `nouveau`, `qualifié`, `contacté`, `répondu`, `écarté`
 
-## Logs
+**Upsert** : sur SIREN — en cas de conflit, ne met à jour que site/email si la nouvelle valeur n'est pas vide.
 
-Tous dans `~/automations/logs/`. Pas de logrotate configur? ? rotation manuelle.
+**config.json** : pilote le contenu du tableau de bord. `status: "active"` → bouton URL visible ; `status: "coming_soon"` → badge "Bientôt disponible".
 
-## Scripts utilitaires (non planifi?s)
+**Crons** : aucun — service uniquement piloté par systemd.
 
-- `_check_props.py`, `_diag_*.py` ? diagnostics ponctuels
-- `_restore_fiche.py` ? restauration d'une fiche Notion depuis backup
-- `auth_gmail.py`, `reauth_drive.py`, `refresh_gmail_token.py` ? renouvellement tokens OAuth Google
-- `check_notion.py`, `test_*.py` ? tests et v?rifications manuelles
-- `scripts/gmail_notion_classification.py` ? version exp?rimentale de classification Gmail
+**Reset mot de passe** : token signé via `itsdangerous` (1h), envoi SMTP OVH SSL port 465 (`ssl0.ovh.net`).

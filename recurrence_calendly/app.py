@@ -12,25 +12,26 @@ S'il est vide et lointain (> WINDOW_DAYS), il est mis en attente dans pending.db
 et réessayé quotidiennement par retry.py.
 """
 
+import base64
 import json
 import logging
 import os
 import re
-import smtplib
 import sqlite3
+import threading
 import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.header import Header
 
 from flask import Flask, jsonify, request
 from dotenv import load_dotenv
 
 load_dotenv(os.path.expanduser("~/automations/.env"))
+
+PROCESSED_FORMS_FILE = os.path.expanduser("~/automations/recurrence_calendly/processed_forms.json")
+_processed_lock = threading.Lock()
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -48,11 +49,10 @@ log = logging.getLogger(__name__)
 # ── Config ────────────────────────────────────────────────────────────────────
 
 CALENDLY_TOKEN = os.environ["CALENDLY_TOKEN"]
-SMTP_HOST      = "smtp.gmail.com"
-SMTP_PORT      = 587
-SMTP_USER      = "boutemy.automatisation@gmail.com"
-SMTP_FROM      = "boutemy.automatisation@gmail.com"
-SMTP_PASS      = os.environ["GMAIL_AUTOMATION_PASSWORD"]
+MAILJET_API_KEY    = os.environ["MAILJET_API_KEY"]
+MAILJET_SECRET_KEY = os.environ["MAILJET_SECRET_KEY"]
+SMTP_FROM_EMAIL    = "no-reply@chloeludmann.fr"
+SMTP_FROM_NAME     = "Chloé Ludmann"
 CHLOE_EMAIL    = "contact@chloeludmann.fr"
 
 # Seuil utilisé pour classifier une réponse API vide : si le créneau est au-delà
@@ -601,21 +601,58 @@ def check_and_book(event_type_uri: str, location: dict, dt_utc: datetime,
 # ── Email ─────────────────────────────────────────────────────────────────────
 
 def send_email(to_addr, subject, html_body, cc=None):
-    msg            = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"]    = f"{str(Header('Chloé Ludmann', 'utf-8'))} <{SMTP_FROM}>"
-    msg["To"]      = to_addr
+    message = {
+        "From":     {"Email": SMTP_FROM_EMAIL, "Name": SMTP_FROM_NAME},
+        "To":       [{"Email": to_addr}],
+        "Subject":  subject,
+        "HTMLPart": html_body,
+    }
     if cc:
-        msg["Cc"] = cc
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-        s.ehlo()
-        s.starttls()
-        s.login(SMTP_USER, SMTP_PASS)
-        s.sendmail(SMTP_FROM, [to_addr] + ([cc] if cc else []), msg.as_string())
+        message["Cc"] = [{"Email": cc}]
+    payload     = json.dumps({"Messages": [message]}).encode()
+    credentials = base64.b64encode(
+        f"{MAILJET_API_KEY}:{MAILJET_SECRET_KEY}".encode()
+    ).decode()
+    req = urllib.request.Request(
+        "https://api.mailjet.com/v3.1/send",
+        data=payload,
+        headers={"Authorization": f"Basic {credentials}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        resp   = urllib.request.urlopen(req, timeout=15)
+        result = json.loads(resp.read())
+        log.info(f"Mailjet OK — {result.get('Messages', [])}")
+    except urllib.error.HTTPError as e:
+        log.error(f"Mailjet erreur {e.code}: {e.read().decode(errors='replace')}")
+        raise
 
 
 # ── Webhook ───────────────────────────────────────────────────────────────────
+
+def _is_processed(response_id: str) -> bool:
+    if not response_id:
+        return False
+    with _processed_lock:
+        try:
+            with open(PROCESSED_FORMS_FILE) as f:
+                return response_id in json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return False
+
+
+def _mark_processed(response_id: str) -> None:
+    with _processed_lock:
+        try:
+            with open(PROCESSED_FORMS_FILE) as f:
+                ids = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            ids = []
+        if response_id not in ids:
+            ids.append(response_id)
+            with open(PROCESSED_FORMS_FILE, "w") as f:
+                json.dump(ids, f)
+
 
 @app.route("/recurrence-webhook", methods=["POST"])
 def tally_webhook():
@@ -624,6 +661,11 @@ def tally_webhook():
     if body.get("eventType") != "FORM_RESPONSE":
         log.info(f"Événement ignoré : {body.get('eventType')}")
         return jsonify({"status": "ignored"}), 200
+
+    form_response_id = body.get("data", {}).get("responseId", "")
+    if _is_processed(form_response_id):
+        log.info(f"Doublon ignoré — responseId déjà traité : {form_response_id}")
+        return jsonify({"status": "already_processed"}), 200
 
     fields = body.get("data", {}).get("fields", [])
     log.info(f"Payload Tally brut — {len(fields)} champ(s) : "
@@ -769,6 +811,10 @@ def tally_webhook():
             "reason":  f"Aucun {jour_nom}{parite_msg} dans la période {date_debut} → {date_fin}",
             "premier_jour_valide": first_valid.strftime("%d/%m/%Y"),
         }), 200
+
+    # Marqué traité ICI (avant les appels Calendly) pour bloquer les retries Tally
+    # qui arrivent pendant le traitement (~26s > timeout Tally ~10s)
+    _mark_processed(form_response_id)
 
     # ── Vérification + réservation ──────────────────────────────────────────
     reserves      = []   # (date_locale, invitee_uri)

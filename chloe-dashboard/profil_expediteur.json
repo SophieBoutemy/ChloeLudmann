@@ -1,0 +1,13 @@
+{
+  "prenom": "Chloé",
+  "nom": "Ludmann",
+  "activite": "Je suis Chloé Ludmann, professeure de chant et cheffe de chœur à Rennes.",
+  "proposition_valeur": "J'aide les passionné·es de chant, débutant·es ou confirmé·es, à développer leur voix et à prendre confiance, dans un cadre bienveillant et sans jugement.",
+  "offre": "Cours de chant réguliers, en visio, toute l'année\r\nCours ponctuels, pour découvrir ou se faire plaisir une fois\r\nCours à offrir en cadeau\r\nCours collectifs, pour progresser ensemble dans une ambiance conviviale\r\nChorale \"Whisper in the Rennes\" : une chorale folk a cappella et percussions corporelles, ouverte à toutes les voix, à Rennes\r\n\r\nTon à adopter :\r\n\r\nChaleureux, enthousiaste, proche, sans jamais être condescendant. Chloé parle à des gens qui ont parfois peur de chanter ou de \"ne pas savoir\" — le ton doit rassurer et donner envie d'essayer, pas impressionner.",
+  "signature": "Chloé Ludmann\r\nprofesseure de chant et cheffe de chœur à Rennes\r\ncontact@chloeludmann.fr",
+  "smtp_host": "ssl0.ovh.net",
+  "smtp_port": "465",
+  "smtp_user": "contact@chloeludmann.fr",
+  "smtp_daily_limit": "50",
+  "smtp_pass": "Correction-Rouspeter-Aliment"
+}

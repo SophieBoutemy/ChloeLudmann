@@ -32,29 +32,32 @@
         </svg>
         <div class="header-brand-text">
           <span class="header-name">Mon Adjoint IA</span>
-          <span class="header-tagline">par Sophie Boutemy</span>
+          <span class="header-tagline">Des outils digitaux qui travaillent pour vous</span>
         </div>
       </div>
 
-      <nav class="header-nav">
+      <nav class="header-nav" id="header-nav">
         <a href="{{ url_for('index') }}"
            class="header-nav-link {% if request.endpoint == 'index' %}active{% endif %}">Tableau de bord</a>
         <a href="{{ url_for('eleves') }}"
-           class="header-nav-link nav-desktop-only {% if request.endpoint in ('eleves', 'eleve_detail', 'eleves_export', 'eleve_relancer', 'eleve_update_property', 'eleve_save_notes') %}active{% endif %}">Base élèves</a>
+           class="header-nav-link {% if request.endpoint in ('eleves', 'eleve_detail', 'eleves_export', 'eleve_relancer', 'eleve_update_property', 'eleve_save_notes') %}active{% endif %}">Base élèves</a>
         <a href="{{ url_for('factures') }}"
-           class="header-nav-link nav-desktop-only {% if request.endpoint in ('factures', 'facture_detail', 'factures_export', 'factures_refresh', 'facture_update_comptable') %}active{% endif %}">Factures</a>
+           class="header-nav-link {% if request.endpoint in ('factures', 'facture_detail', 'factures_export', 'factures_refresh', 'facture_update_comptable') %}active{% endif %}">Factures</a>
         <a href="{{ url_for('liste_attente') }}"
-           class="header-nav-link nav-desktop-only {% if request.endpoint == 'liste_attente' %}active{% endif %}">Liste d'attente</a>
+           class="header-nav-link {% if request.endpoint == 'liste_attente' %}active{% endif %}">Liste d'attente</a>
         <a href="{{ url_for('brief_to_post') }}"
-           class="header-nav-link nav-desktop-only {% if request.endpoint in ('brief_to_post', 'brief_to_post_generate', 'brief_to_post_item') %}active{% endif %}">Brief to Post</a>
+           class="header-nav-link {% if request.endpoint in ('brief_to_post', 'brief_to_post_generate', 'brief_to_post_item') %}active{% endif %}">Brief to Post</a>
         <a href="{{ url_for('recurrence') }}"
-           class="header-nav-link nav-desktop-only {% if request.endpoint in ('recurrence', 'recurrence_logs') %}active{% endif %}">Cours récurrents</a>
+           class="header-nav-link {% if request.endpoint in ('recurrence', 'recurrence_logs') %}active{% endif %}">Cours récurrents</a>
+        <a href="{{ url_for('prospection') }}"
+           class="header-nav-link {% if request.endpoint in ('prospection', 'prospection_contacts', 'prospection_priorite', 'prospection_profile', 'prospection_today', 'prospection_funnel') %}active{% endif %}">Prospection</a>
         <a href="{{ url_for('rgpd') }}"
-           class="header-nav-link nav-desktop-only {% if request.endpoint == 'rgpd' %}active{% endif %}"
+           class="header-nav-link {% if request.endpoint == 'rgpd' %}active{% endif %}"
            style="font-size:.78rem;color:var(--muted)">RGPD</a>
       </nav>
 
       <div class="header-right">
+        <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
         <a href="{{ url_for('logout') }}" class="nav-logout"
            title="Déconnexion" aria-label="Déconnexion">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -74,5 +77,40 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <div class="site-footer-links">
+        <a href="https://mon-adjoint-ia.fr/mentions-legales.html" target="_blank" rel="noopener">Mentions légales</a>
+        <span class="site-footer-sep">·</span>
+        <a href="https://mon-adjoint-ia.fr/cgv.html" target="_blank" rel="noopener">CGV</a>
+        <span class="site-footer-sep">·</span>
+        <a href="{{ url_for('politique_confidentialite') }}">RGPD</a>
+        <span class="site-footer-sep">·</span>
+        <a href="{{ url_for('contact_page') }}">Contact</a>
+        <span class="site-footer-sep">·</span>
+        <a href="https://sophieboutemy.fr" target="_blank" rel="noopener">sophieboutemy.fr</a>
+        <span class="site-footer-sep">·</span>
+        <a href="https://mon-adjoint-ia.fr" target="_blank" rel="noopener">mon-adjoint-ia.fr</a>
+      </div>
+      <div class="site-footer-copy">&copy; {{ current_year }} Sophie Boutemy</div>
+    </div>
+  </footer>
+  <script>
+  (function(){
+    var btn=document.getElementById('nav-hamburger');
+    var nav=document.getElementById('header-nav');
+    if(!btn||!nav)return;
+    btn.addEventListener('click',function(){
+      var o=nav.classList.toggle('open');
+      btn.setAttribute('aria-expanded',String(o));
+    });
+    document.addEventListener('click',function(e){
+      if(!btn.contains(e.target)&&!nav.contains(e.target)){
+        nav.classList.remove('open');
+        btn.setAttribute('aria-expanded','false');
+      }
+    });
+  })();
+  </script>
 </body>
 </html>

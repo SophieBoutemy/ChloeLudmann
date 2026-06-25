@@ -18,6 +18,7 @@ from flask import Flask, jsonify, render_template, redirect, request, send_file,
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+import csv
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 DOTENV_PATH = '/home/ubuntu/automations/.env'
@@ -63,6 +64,66 @@ RGPD_LOG_FILES = [
 
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
 BTP_DB_PATH       = os.path.join(os.path.dirname(__file__), 'brief_to_post.db')
+
+# ── Adjoint Prospection ───────────────────────────────────────────────────────
+_DASH_DIR    = os.path.dirname(__file__)
+SECTEURS_PATH = os.path.join(_DASH_DIR, 'secteurs_naf.json')
+QUOTA_PATH    = os.path.join(_DASH_DIR, 'prospection', 'email_quota.json')
+
+with open(SECTEURS_PATH, encoding='utf-8') as _sf:
+    SECTEURS_NAF = json.load(_sf)
+
+STATUT_OPTIONS = [
+    ('nouveau',         'Nouveau'),
+    ('qualifié',        'Qualifié'),
+    ('contacté',        'Contacté'),
+    ('1er contact',     '1er contact'),
+    ('proposition',     'Proposition envoyée'),
+    ('relancé',         'Relancé'),
+    ('suivi',           'En suivi'),
+    ('répondu',         'A répondu'),
+    ('rdv',             'RDV fixé'),
+    ('converti',        'Converti'),
+    ('injoignable',     'Injoignable'),
+    ('pas intéressé',   'Pas intéressé'),
+    ('écarté',          'Écarté'),
+    ('désinscrit',      'Désinscrit'),
+]
+
+from prospection.storage import (
+    EXPORT_COLS, delete_contacts, delete_contacts_empty,
+    get_all_for_export, get_contact_by_id, get_contacts,
+    get_filtered_for_export, get_funnel_stats, get_naf_list,
+    get_priorite_contacts, get_stats, get_today_contacts,
+    get_tranche_list, init_db as init_prospection_db,
+    is_desinscrit, update_contact, upsert_contact,
+)
+from prospection.runner import get_task_status, start_search, start_search_ch, start_search_be
+from prospection.drafter import EMAIL_TYPES, generate_draft, load_profile, save_profile
+from prospection.scraper import TRANCHE_LABELS
+
+init_prospection_db()
+
+
+def _get_quota():
+    today = datetime.now().strftime('%Y-%m-%d')
+    try:
+        with open(QUOTA_PATH) as f:
+            q = json.load(f)
+        if q.get('date') == today:
+            return q.get('count', 0)
+    except Exception:
+        pass
+    return 0
+
+
+def _increment_quota():
+    today = datetime.now().strftime('%Y-%m-%d')
+    count = _get_quota() + 1
+    with open(QUOTA_PATH, 'w') as f:
+        json.dump({'date': today, 'count': count}, f)
+    return count
+
 
 BTP_SYSTEM_PROMPT = """Tu es expert en communication réseaux sociaux.
 
@@ -504,35 +565,42 @@ def reset_password(token):
 
 _AGENT_CARDS = [
     {
-        'title':     'Base de données élèves',
+        'title':     'Adjoint Client',
         'agent_key': 'Suivi Élèves',
         'btn_label': 'Ouvrir la base élèves',
         'btn_endpoint': 'eleves',
     },
     {
-        'title':     'Factures',
+        'title':     'Adjoint Factures',
         'agent_key': 'Factures',
         'btn_label': 'Ouvrir les factures',
         'btn_endpoint': 'factures',
     },
     {
-        'title':     "Liste d'attente",
+        'title':     "Adjoint Attente",
         'agent_key': "Liste d'attente",
         'btn_label': "Ouvrir la liste d'attente",
         'btn_endpoint': 'liste_attente',
     },
     {
-        'title':       'Brief to Post',
+        'title':       'Adjoint Social',
         'agent_key':   '',
         'btn_label':   'Ouvrir Brief to Post',
         'btn_endpoint': 'brief_to_post',
         'description': "Génération de contenus réseaux sociaux et newsletter via IA (Instagram, Facebook, LinkedIn, Newsletter) à partir d'un brief texte — avec historique et édition inline.",
     },
     {
-        'title':       'Cours récurrents',
+        'title':       'Adjoint Planning',
         'agent_key':   'Cours récurrents',
         'btn_label':   'Voir les cours récurrents',
         'btn_endpoint': 'recurrence',
+    },
+    {
+        'title':       'Adjoint Prospection',
+        'agent_key':   '',
+        'btn_label':   'Ouvrir la prospection',
+        'btn_endpoint': 'prospection',
+        'description': "Recherche d'entreprises par secteur et d?partement, enrichissement automatique (site web, email), gestion des contacts avec statuts et notes, r?daction d'emails par IA et suivi des envois.",
     },
 ]
 
@@ -1312,5 +1380,363 @@ def rgpd():
     return render_template('rgpd.html')
 
 
+
+
+# ── Routes Adjoint Prospection ────────────────────────────────────────────────
+
+@app.route('/prospection')
+@login_required
+def prospection():
+    stats = get_stats()
+    task = get_task_status()
+    today_count = len(get_today_contacts())
+    quota = _get_quota()
+    profile = load_profile()
+    daily_limit = int(profile.get('smtp_daily_limit', 50))
+    return render_template('prospection.html', stats=stats, task=task,
+                           secteurs=SECTEURS_NAF, statut_options=STATUT_OPTIONS,
+                           today_count=today_count, tranche_labels=TRANCHE_LABELS,
+                           quota=quota, daily_limit=daily_limit)
+
+
+@app.route('/prospection/run', methods=['POST'])
+@login_required
+def prospection_run():
+    country = request.form.get('country', 'FR')
+    max_results = min(int(request.form.get('max_results', 50)), 200)
+    enrichissement = '1' in request.form.getlist('enrichissement')
+    if country == 'CH':
+        keywords_raw = request.form.get('ch_keywords', '').strip()
+        keywords = [k.strip() for k in keywords_raw.splitlines() if k.strip()]
+        cantons = request.form.getlist('ch_cantons') or None
+        if not keywords:
+            return redirect(url_for('prospection'))
+        start_search_ch(keywords, cantons, max_results, enrichissement)
+    elif country == 'BE':
+        keywords_raw = request.form.get('be_keywords', '').strip()
+        keywords = [k.strip() for k in keywords_raw.splitlines() if k.strip()]
+        provinces = request.form.getlist('be_provinces') or None
+        if not keywords:
+            return redirect(url_for('prospection'))
+        start_search_be(keywords, provinces, max_results, enrichissement)
+    else:
+        naf_codes = request.form.getlist('naf_codes')
+        departements_raw = request.form.get('departements', '').strip()
+        departements = [d.strip() for d in departements_raw.split(',') if d.strip()] or None
+        tranche_effectifs = request.form.getlist('tranche_effectif') or None
+        if not naf_codes:
+            return redirect(url_for('prospection'))
+        start_search(naf_codes, departements, max_results, enrichissement, tranche_effectifs)
+    return redirect(url_for('prospection'))
+
+
+@app.route('/prospection/status')
+@login_required
+def prospection_status():
+    return jsonify(get_task_status())
+
+
+@app.route('/prospection/contacts')
+@login_required
+def prospection_contacts():
+    statut  = request.args.get('statut', '')
+    naf     = request.args.get('naf', '')
+    tranche = request.args.get('tranche', '')
+    search  = request.args.get('search', '')
+    page    = max(1, int(request.args.get('page', 1)))
+    per_page = 50
+    rows, total = get_contacts(
+        statut=statut or None, naf=naf or None,
+        tranche=tranche or None, search=search or None,
+        limit=per_page, offset=(page - 1) * per_page,
+    )
+    naf_list     = get_naf_list()
+    tranche_list = get_tranche_list()
+    pages = max(1, (total + per_page - 1) // per_page)
+    today = datetime.now().strftime('%Y-%m-%d')
+    quota = _get_quota()
+    profile = load_profile()
+    daily_limit = int(profile.get('smtp_daily_limit', 50))
+    smtp_configured = bool(profile.get('smtp_user') and profile.get('smtp_pass'))
+    return render_template(
+        'contacts.html',
+        contacts=rows, total=total, page=page, pages=pages,
+        naf_list=naf_list, statut_options=STATUT_OPTIONS,
+        email_types=EMAIL_TYPES,
+        tranche_list=tranche_list, tranche_labels=TRANCHE_LABELS,
+        filters={'statut': statut, 'naf': naf, 'tranche': tranche, 'search': search},
+        today=today, quota=quota, daily_limit=daily_limit, smtp_configured=smtp_configured,
+    )
+
+
+@app.route('/prospection/contacts/export.csv')
+@login_required
+def prospection_export():
+    statut  = request.args.get('statut', '') or None
+    naf     = request.args.get('naf', '') or None
+    tranche = request.args.get('tranche', '') or None
+    search  = request.args.get('search', '') or None
+    rows = get_filtered_for_export(statut=statut, naf=naf, tranche=tranche, search=search)
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=EXPORT_COLS)
+    w.writeheader()
+    w.writerows(rows)
+    buf.seek(0)
+    return send_file(
+        io.BytesIO(buf.getvalue().encode('utf-8-sig')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f'contacts_{datetime.now().strftime("%Y%m%d")}.csv',
+    )
+
+
+@app.route('/prospection/contacts/export.xlsx')
+@login_required
+def prospection_export_xlsx():
+    from openpyxl import Workbook as _WB
+    statut  = request.args.get('statut', '') or None
+    naf     = request.args.get('naf', '') or None
+    tranche = request.args.get('tranche', '') or None
+    search  = request.args.get('search', '') or None
+    rows = get_filtered_for_export(statut=statut, naf=naf, tranche=tranche, search=search)
+    wb = _WB(); ws = wb.active; ws.title = 'Contacts'
+    ws.append(EXPORT_COLS)
+    for row in rows:
+        ws.append([row.get(col, '') or '' for col in EXPORT_COLS])
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return send_file(
+        buf,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'contacts_{datetime.now().strftime("%Y%m%d")}.xlsx',
+    )
+
+
+@app.route('/prospection/contacts/delete', methods=['POST'])
+@login_required
+def prospection_contacts_delete():
+    ids = [i for i in request.form.getlist('ids') if i.isdigit()]
+    if ids:
+        delete_contacts([int(i) for i in ids])
+    return redirect(request.form.get('next') or url_for('prospection_contacts'))
+
+
+@app.route('/prospection/contacts/delete-empty', methods=['POST'])
+@login_required
+def prospection_contacts_delete_empty():
+    delete_contacts_empty()
+    return redirect(request.form.get('next') or url_for('prospection_contacts'))
+
+
+@app.route('/prospection/contacts/<int:contact_id>', methods=['PATCH'])
+@login_required
+def prospection_contact_update(contact_id):
+    data = request.get_json(force=True) or {}
+    update_contact(contact_id, data)
+    return jsonify({'ok': True})
+
+
+@app.route('/prospection/contacts/<int:contact_id>/desinscrit', methods=['POST'])
+@login_required
+def prospection_desinscrit(contact_id):
+    update_contact(contact_id, {'statut': 'désinscrit'})
+    return redirect(request.form.get('next') or url_for('prospection_contacts'))
+
+
+@app.route('/prospection/contacts/<int:contact_id>/draft', methods=['POST'])
+@login_required
+def prospection_draft(contact_id):
+    contact = get_contact_by_id(contact_id)
+    if not contact:
+        return jsonify({'error': 'Contact introuvable'}), 404
+    data = request.get_json(force=True) or {}
+    try:
+        draft = generate_draft(contact, data.get('email_type', 'premier_contact'))
+        return jsonify(draft)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/prospection/contacts/<int:contact_id>/send', methods=['POST'])
+@login_required
+def prospection_send(contact_id):
+    contact = get_contact_by_id(contact_id)
+    if not contact:
+        return jsonify({'error': 'Contact introuvable'}), 404
+    if contact.get('statut') == 'désinscrit':
+        return jsonify({'error': 'Ce contact est désinscrit'}), 403
+    if not contact.get('email'):
+        return jsonify({'error': "Pas d'adresse email pour ce contact"}), 400
+    profile = load_profile()
+    daily_limit = int(profile.get('smtp_daily_limit', 50))
+    if _get_quota() >= daily_limit:
+        return jsonify({'error': f'Quota quotidien atteint ({daily_limit} emails/jour)'}), 429
+    smtp_user = profile.get('smtp_user', '')
+    smtp_pass = profile.get('smtp_pass', '')
+    if not smtp_user or not smtp_pass:
+        return jsonify({'error': 'SMTP non configuré dans le profil expéditeur'}), 400
+    data = request.get_json(force=True) or {}
+    subject = data.get('subject', '').strip()
+    body    = data.get('body', '').strip()
+    if not subject or not body:
+        return jsonify({'error': 'Objet et corps requis'}), 400
+    smtp_host = profile.get('smtp_host', 'ssl0.ovh.net')
+    smtp_port = int(profile.get('smtp_port', 465))
+    sender_name = f"{profile.get('prenom', '')} {profile.get('nom', '')}".strip()
+    _type_status = {'premier_contact': '1er contact', 'relance': 'relancé', 'suivi': 'suivi'}
+    new_statut = _type_status.get(data.get('email_type', 'premier_contact'), '1er contact')
+    try:
+        msg = MIMEText(body, 'plain', 'utf-8')
+        msg['Subject'] = subject
+        msg['From'] = f'{sender_name} <{smtp_user}>' if sender_name else smtp_user
+        msg['To'] = contact['email']
+        with smtplib.SMTP_SSL(smtp_host, smtp_port) as s:
+            s.login(smtp_user, smtp_pass)
+            s.send_message(msg)
+        new_count = _increment_quota()
+        note = f"Email envoyé le {datetime.now().strftime('%d/%m/%Y')} : {subject}"
+        existing = contact.get('notes', '')
+        new_notes = (existing + '\n' + note).strip() if existing else note
+        update_contact(contact_id, {'statut': new_statut, 'notes': new_notes})
+        return jsonify({'ok': True, 'quota': new_count, 'limit': daily_limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/prospection/contacts/<int:contact_id>/mark-sent', methods=['POST'])
+@login_required
+def prospection_mark_sent(contact_id):
+    contact = get_contact_by_id(contact_id)
+    if not contact:
+        return jsonify({'error': 'Contact introuvable'}), 404
+    if contact.get('statut') == 'désinscrit':
+        return jsonify({'error': 'Ce contact est désinscrit'}), 403
+    data = request.get_json(force=True) or {}
+    email_type = data.get('email_type', 'premier_contact')
+    _type_status = {'premier_contact': '1er contact', 'relance': 'relancé', 'suivi': 'suivi'}
+    new_statut = _type_status.get(email_type, '1er contact')
+    type_label = EMAIL_TYPES.get(email_type, email_type)
+    note = f"Marqué envoyé le {datetime.now().strftime('%d/%m/%Y')} ({type_label})"
+    existing = contact.get('notes', '')
+    new_notes = (existing + '\n' + note).strip() if existing else note
+    update_contact(contact_id, {'statut': new_statut, 'notes': new_notes})
+    return jsonify({'ok': True, 'statut': new_statut})
+
+
+@app.route('/prospection/profile', methods=['GET', 'POST'])
+@login_required
+def prospection_profile():
+    saved = False
+    if request.method == 'POST':
+        existing = load_profile()
+        profile = {
+            'prenom':             request.form.get('prenom', '').strip(),
+            'nom':                request.form.get('nom', '').strip(),
+            'activite':           request.form.get('activite', '').strip(),
+            'proposition_valeur': request.form.get('proposition_valeur', '').strip(),
+            'offre':              request.form.get('offre', '').strip(),
+            'cible':              request.form.get('cible', '').strip(),
+            'signature':          request.form.get('signature', '').strip(),
+            'smtp_host':          request.form.get('smtp_host', 'ssl0.ovh.net').strip(),
+            'smtp_port':          request.form.get('smtp_port', '465').strip(),
+            'smtp_user':          request.form.get('smtp_user', '').strip(),
+            'smtp_daily_limit':   request.form.get('smtp_daily_limit', '50').strip(),
+        }
+        new_pass = request.form.get('smtp_pass', '').strip()
+        profile['smtp_pass'] = new_pass if new_pass else existing.get('smtp_pass', '')
+        save_profile(profile)
+        saved = True
+    profile = load_profile()
+    quota = _get_quota()
+    daily_limit = int(profile.get('smtp_daily_limit', 50))
+    return render_template('profile.html', profile=profile, saved=saved,
+                           quota=quota, daily_limit=daily_limit)
+
+
+@app.route('/prospection/today')
+@login_required
+def prospection_today():
+    contacts = get_today_contacts()
+    today_str = datetime.now().strftime('%d/%m/%Y')
+    return render_template('today.html', contacts=contacts,
+                           statut_options=STATUT_OPTIONS,
+                           email_types=EMAIL_TYPES,
+                           today=today_str)
+
+
+@app.route('/prospection/priorite')
+@login_required
+def prospection_priorite():
+    contacts = get_priorite_contacts(limit=15)
+    quota = _get_quota()
+    profile = load_profile()
+    daily_limit = int(profile.get('smtp_daily_limit', 50))
+    smtp_configured = bool(profile.get('smtp_user') and profile.get('smtp_pass'))
+    return render_template('priorite.html', contacts=contacts,
+                           statut_options=STATUT_OPTIONS,
+                           email_types=EMAIL_TYPES,
+                           today=datetime.now().strftime('%Y-%m-%d'),
+                           quota=quota, daily_limit=daily_limit,
+                           smtp_configured=smtp_configured)
+
+
+@app.route('/prospection/funnel')
+@login_required
+def prospection_funnel():
+    raw = get_funnel_stats()
+    total = sum(raw.values()) if raw else 0
+    funnel = []
+    for val, label in STATUT_OPTIONS:
+        funnel.append({'val': val, 'label': label, 'count': raw.get(val, 0)})
+    known = {v for v, _ in STATUT_OPTIONS}
+    for val, count in raw.items():
+        if val not in known:
+            funnel.append({'val': val, 'label': val, 'count': count})
+    return render_template('funnel.html', funnel=funnel, total=total)
+
+
+# ── Footer pages ─────────────────────────────────────────────────────────────
+
+@app.context_processor
+def inject_year():
+    return {'current_year': datetime.now().year}
+
+
+
+@app.route('/contact', methods=['GET', 'POST'])
+def contact_page():
+    sent = False
+    error = None
+    if request.method == 'POST':
+        nom     = request.form.get('nom', '').strip()
+        email   = request.form.get('email', '').strip()
+        sujet   = request.form.get('sujet', '').strip()
+        message = request.form.get('message', '').strip()
+        if nom and email and message:
+            try:
+                smtp_user = os.getenv('IMAP_EMAIL', '')
+                smtp_pass = os.getenv('IMAP_PASSWORD', '')
+                body = f"Nom : {nom}\nEmail : {email}\n\n{message}"
+                msg = MIMEText(body, 'plain', 'utf-8')
+                msg['Subject'] = f"[Contact] {sujet or 'Message depuis le dashboard'}"
+                msg['From']     = smtp_user
+                msg['To']       = 'contact@sophieboutemy.fr'
+                msg['Reply-To'] = email
+                with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as s:
+                    s.login(smtp_user, smtp_pass)
+                    s.send_message(msg)
+                sent = True
+            except Exception as e:
+                error = str(e)
+        else:
+            error = 'Veuillez remplir tous les champs obligatoires.'
+    return render_template('contact.html', sent=sent, error=error)
+
+
+@app.route('/politique-confidentialite')
+def politique_confidentialite():
+    return render_template('rgpd_info.html')
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5005, debug=False)
+

@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% block title %}Profil expéditeur — Mon Espace Pro{% endblock %}
+
+{% block extra_head %}
+<style>
+.profile-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 2rem;
+  max-width: 640px;
+}
+.profile-card h2 {
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  font-family: 'Karla', sans-serif;
+  margin-bottom: 1.4rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1.5px solid var(--border);
+}
+.profile-card h2:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+.pf-field { margin-bottom: 1.1rem; }
+.pf-field label {
+  display: block;
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--text);
+  font-family: 'Karla', sans-serif;
+  margin-bottom: .35rem;
+}
+.pf-field input, .pf-field textarea {
+  width: 100%;
+  padding: .5rem .75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: .875rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
+  background: #fafaf9;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color .15s;
+}
+.pf-field input:focus, .pf-field textarea:focus { border-color: var(--green); background: #fff; }
+.pf-field textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+.pf-field small { display: block; font-size: .75rem; color: var(--muted); margin-top: .3rem; }
+.pf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 540px) { .pf-row { grid-template-columns: 1fr; } }
+.pf-row-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; }
+@media (max-width: 600px) { .pf-row-3 { grid-template-columns: 1fr 1fr; } }
+.pf-actions { display: flex; gap: .75rem; margin-top: 1.4rem; align-items: center; flex-wrap: wrap; }
+.pf-btn-save {
+  padding: .5rem 1.4rem;
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: .875rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  cursor: pointer;
+  transition: background .15s;
+}
+.pf-btn-save:hover { background: #2a3b1e; }
+.pf-back { font-size: .875rem; color: var(--muted); text-decoration: none; font-family: 'Karla', sans-serif; }
+.pf-back:hover { color: var(--text); }
+.pf-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .85rem;
+  color: #166534;
+  font-family: 'Karla', sans-serif;
+  background: #dcfce7;
+  padding: .35rem .75rem;
+  border-radius: 6px;
+}
+.pf-intro { font-size: .875rem; color: var(--muted); font-family: 'Karla', sans-serif; margin-bottom: 1.5rem; line-height: 1.5; }
+.quota-bar-wrap { margin-top: .5rem; }
+.quota-bar-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.quota-bar-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width .3s; }
+.quota-label { font-size: .78rem; color: var(--muted); font-family: 'Karla', sans-serif; margin-top: .3rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Profil expéditeur</h1>
+    <div class="sub-nav">
+      <a href="{{ url_for('prospection_contacts') }}" class="sub-nav-contacts">Contacts</a>
+      <div class="sub-nav-right">
+        <a href="{{ url_for('prospection_profile') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_profile' %} active{% endif %}">Profil expéditeur</a>
+        <a href="{{ url_for('prospection_today') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_today' %} active{% endif %}">À traiter</a>
+        <a href="{{ url_for('prospection_funnel') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_funnel' %} active{% endif %}">Entonnoir</a>
+      </div>
+    </div>
+  </div>
+  <div class="page-back"><a href="{{ url_for('prospection') }}">← Tableau de bord Adjoint Prospection</a></div>
+</div>
+
+<div class="profile-card">
+  <p class="pf-intro">
+    Ces informations sont utilisées par l'IA pour rédiger des emails personnalisés à votre place.
+    Plus votre profil est précis, meilleurs seront les emails générés.
+  </p>
+
+  <form method="post" action="{{ url_for('prospection_profile') }}">
+    <h2>Identité</h2>
+    <div class="pf-row">
+      <div class="pf-field">
+        <label for="prenom">Prénom</label>
+        <input type="text" id="prenom" name="prenom" value="{{ profile.prenom }}" required>
+      </div>
+      <div class="pf-field">
+        <label for="nom">Nom</label>
+        <input type="text" id="nom" name="nom" value="{{ profile.nom }}" required>
+      </div>
+    </div>
+
+    <div class="pf-field">
+      <label for="activite">Votre activité</label>
+      <input type="text" id="activite" name="activite" value="{{ profile.activite }}"
+             placeholder="Ex : Consultante en automatisation et IA pour TPE/PME">
+      <small>Une ligne, concise. Sera utilisée pour vous présenter dans les emails.</small>
+    </div>
+
+    <div class="pf-field">
+      <label for="proposition_valeur">Proposition de valeur</label>
+      <textarea id="proposition_valeur" name="proposition_valeur" rows="3"
+                placeholder="Ex : J'aide les petites entreprises à automatiser leurs tâches répétitives…">{{ profile.proposition_valeur }}</textarea>
+      <small>Ce que vous apportez concrètement à vos prospects. Soyez spécifique.</small>
+    </div>
+
+    <div class="pf-field">
+      <label for="offre">Offre concrète <span style="font-weight:400;color:var(--muted)">(cas d'usage, exemples de livrables)</span></label>
+      <textarea id="offre" name="offre" rows="3"
+                placeholder="Ex : Automatisation des devis sous 5 min, suivi client par email sans intervention manuelle, extraction des données factures vers tableau de bord…">{{ profile.offre or '' }}</textarea>
+      <small>2-3 exemples concrets. L'IA piochera celui qui colle le mieux au secteur du prospect.</small>
+    </div>
+
+    <div class="pf-field">
+      <label for="cible">Cible</label>
+      <input type="text" id="cible" name="cible" value="{{ profile.cible or '' }}"
+             placeholder="Ex : structures culturelles/associations/team-building">
+      <small>Votre cible principale. Utilisée pour personnaliser les emails générés.</small>
+    </div>
+
+    <div class="pf-field">
+      <label for="signature">Signature email</label>
+      <textarea id="signature" name="signature" rows="4"
+                placeholder="Sophie Boutemy&#10;Consultante en automatisation IA&#10;contact@sophieboutemy.com">{{ profile.signature }}</textarea>
+      <small>Telle qu'elle apparaîtra à la fin de chaque email généré.</small>
+    </div>
+
+    <h2>Configuration SMTP (envoi d'emails)</h2>
+
+    <div class="pf-row-3">
+      <div class="pf-field">
+        <label for="smtp_host">Serveur SMTP</label>
+        <input type="text" id="smtp_host" name="smtp_host"
+               value="{{ profile.smtp_host or 'ssl0.ovh.net' }}"
+               placeholder="ssl0.ovh.net">
+      </div>
+      <div class="pf-field">
+        <label for="smtp_port">Port</label>
+        <input type="number" id="smtp_port" name="smtp_port"
+               value="{{ profile.smtp_port or '465' }}"
+               placeholder="465">
+      </div>
+      <div class="pf-field">
+        <label for="smtp_daily_limit">Limite / jour</label>
+        <input type="number" id="smtp_daily_limit" name="smtp_daily_limit"
+               value="{{ profile.smtp_daily_limit or '50' }}"
+               min="1" max="500">
+      </div>
+    </div>
+
+    <div class="pf-row">
+      <div class="pf-field">
+        <label for="smtp_user">Email expéditeur</label>
+        <input type="email" id="smtp_user" name="smtp_user"
+               value="{{ profile.smtp_user or '' }}"
+               placeholder="contact@sophieboutemy.com">
+      </div>
+      <div class="pf-field">
+        <label for="smtp_pass">Mot de passe SMTP</label>
+        <input type="password" id="smtp_pass" name="smtp_pass"
+               value="" placeholder="{% if profile.smtp_pass %}••••••••{% else %}Mot de passe{% endif %}">
+        <small>Laissez vide pour conserver le mot de passe actuel.</small>
+      </div>
+    </div>
+
+    {% if daily_limit %}
+    <div class="quota-bar-wrap">
+      <div class="quota-bar-track">
+        <div class="quota-bar-fill" style="width:{{ [quota / daily_limit * 100, 100] | min | round | int }}%"></div>
+      </div>
+      <div class="quota-label">Envois aujourd'hui : {{ quota }} / {{ daily_limit }}</div>
+    </div>
+    {% endif %}
+
+    <div class="pf-actions">
+      <button type="submit" class="pf-btn-save">Enregistrer</button>
+      {% if saved %}
+      <span class="pf-saved">✓ Profil enregistré</span>
+      {% endif %}
+      <a href="{{ url_for('prospection_contacts') }}" class="pf-back">Voir les contacts →</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -8,11 +8,11 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.expanduser("~/automations/.env"))
 
-SMTP_HOST    = "smtp.gmail.com"
+SMTP_HOST    = "in-v3.mailjet.com"
 SMTP_PORT    = 587
-SMTP_USER    = "boutemy.automatisation@gmail.com"
-SMTP_PASS    = os.environ.get("GMAIL_AUTOMATION_PASSWORD", "")
-MAIL_FROM    = "Chloé Ludmann <boutemy.automatisation@gmail.com>"
+SMTP_USER    = os.environ.get("MAILJET_API_KEY", "")
+SMTP_PASS    = os.environ.get("MAILJET_SECRET_KEY", "")
+MAIL_FROM    = "Chloé Ludmann <no-reply@chloeludmann.fr>"
 CALENDLY_URL = os.environ.get("CALENDLY_URL", "")
 
 ADMIN_EMAIL   = "contact@chloeludmann.fr"
@@ -23,17 +23,26 @@ OVH_SMTP_PASS = os.environ.get("IMAP_PASSWORD", "")
 
 
 def _send(to_email: str, subject: str, html: str) -> None:
-    msg            = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"]    = MAIL_FROM
-    msg["To"]      = to_email
-    msg.attach(MIMEText(html, "html", "utf-8"))
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
-        smtp.ehlo()
-        smtp.starttls()
-        smtp.ehlo()
-        smtp.login(SMTP_USER, SMTP_PASS)
-        smtp.sendmail(SMTP_USER, [to_email], msg.as_string())
+    import base64 as _b64, urllib.request as _ur, json as _js
+    message = {
+        "From":     {"Email": "no-reply@chloeludmann.fr", "Name": "Chloé Ludmann"},
+        "To":       [{"Email": to_email}],
+        "Subject":  subject,
+        "HTMLPart": html,
+    }
+    payload     = _js.dumps({"Messages": [message]}).encode()
+    credentials = _b64.b64encode(f"{SMTP_USER}:{SMTP_PASS}".encode()).decode()
+    req = _ur.Request(
+        "https://api.mailjet.com/v3.1/send",
+        data=payload,
+        headers={"Authorization": f"Basic {credentials}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    resp   = _ur.urlopen(req, timeout=15)
+    result = _js.loads(resp.read())
+    status = result.get("Messages", [{}])[0].get("Status", "unknown")
+    if status != "success":
+        raise RuntimeError(f"Mailjet status inattendu: {result}")
 
 
 _JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
