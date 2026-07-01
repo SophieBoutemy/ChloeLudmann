@@ -7,8 +7,8 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'contacts.db')
 EXPORT_COLS = [
     'siren', 'nom_entreprise', 'nom_dirigeant', 'naf', 'activite',
     'adresse', 'code_postal', 'ville', 'departement', 'date_creation',
-    'tranche_effectif', 'date_rappel',
-    'site_web', 'site_web_statut', 'email', 'email_statut',
+    'tranche_effectif', 'date_rappel', 'date_premier_contact', 'date_relance',
+    'site_web', 'site_web_statut', 'email', 'email_statut', 'email_type',
     'statut', 'notes', 'date_collecte',
 ]
 
@@ -33,9 +33,12 @@ def init_db():
             site_web_statut  TEXT DEFAULT '',
             email            TEXT DEFAULT '',
             email_statut     TEXT DEFAULT '',
+            email_type       TEXT DEFAULT '',
             statut           TEXT DEFAULT 'nouveau',
             notes            TEXT DEFAULT '',
             date_rappel      TEXT DEFAULT NULL,
+            date_premier_contact TEXT DEFAULT NULL,
+            date_relance     TEXT DEFAULT NULL,
             date_collecte    TEXT,
             date_maj         TEXT
         )
@@ -46,6 +49,9 @@ def init_db():
         "date_creation TEXT DEFAULT ''",
         "tranche_effectif TEXT DEFAULT ''",
         "date_rappel TEXT DEFAULT NULL",
+        "email_type TEXT DEFAULT ''",
+        "date_premier_contact TEXT DEFAULT NULL",
+        "date_relance TEXT DEFAULT NULL",
     ):
         try:
             conn.execute(f'ALTER TABLE contacts ADD COLUMN {col_def}')
@@ -75,19 +81,22 @@ def is_desinscrit(siren='', email=''):
 
 
 def upsert_contact(contact):
-    """Insert or update a contact. Skips silently if already désinscrit."""
+    """Insert or update a contact. Returns 'created', 'updated', or None if skipped."""
     if is_desinscrit(contact.get('siren', ''), contact.get('email', '')):
-        return
+        return None
     now = datetime.now().strftime('%Y-%m-%d %H:%M')
     conn = sqlite3.connect(DB_PATH)
     try:
+        exists = conn.execute(
+            'SELECT id FROM contacts WHERE siren=?', (contact['siren'],)
+        ).fetchone() is not None
         conn.execute('''
             INSERT INTO contacts
                 (siren, nom_entreprise, nom_dirigeant, naf, activite,
                  adresse, code_postal, ville, departement, date_creation,
                  tranche_effectif,
-                 site_web, site_web_statut, email, email_statut, date_collecte, date_maj)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 site_web, site_web_statut, email, email_statut, email_type, date_collecte, date_maj)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(siren) DO UPDATE SET
                 date_creation    = CASE WHEN excluded.date_creation    != '' THEN excluded.date_creation    ELSE date_creation    END,
                 tranche_effectif = CASE WHEN excluded.tranche_effectif != '' THEN excluded.tranche_effectif ELSE tranche_effectif END,
@@ -95,6 +104,7 @@ def upsert_contact(contact):
                 site_web_statut  = CASE WHEN excluded.site_web         != '' THEN excluded.site_web_statut  ELSE site_web_statut  END,
                 email            = CASE WHEN excluded.email            != '' THEN excluded.email            ELSE email            END,
                 email_statut     = CASE WHEN excluded.email_statut     != '' THEN excluded.email_statut     ELSE email_statut     END,
+                email_type       = CASE WHEN excluded.email_type       != '' THEN excluded.email_type       ELSE email_type       END,
                 date_maj         = excluded.date_maj
         ''', (
             contact['siren'], contact['nom_entreprise'],
@@ -106,9 +116,11 @@ def upsert_contact(contact):
             contact.get('tranche_effectif', ''),
             contact.get('site_web', ''), contact.get('site_web_statut', ''),
             contact.get('email', ''), contact.get('email_statut', ''),
+            contact.get('email_type', ''),
             now, now,
         ))
         conn.commit()
+        return 'updated' if exists else 'created'
     finally:
         conn.close()
 
@@ -121,7 +133,7 @@ def get_contacts(statut=None, naf=None, tranche=None, search=None,
     q = "SELECT * FROM contacts WHERE 1=1"
     params = []
     if not include_unsubscribed:
-        q += " AND statut != 'désinscrit'"
+        q += " AND statut NOT IN ('désinscrit', 'archivé')"
     if statut:
         q += ' AND statut=?'; params.append(statut)
     if naf:
@@ -153,15 +165,15 @@ def get_contact_by_id(contact_id):
 def get_stats():
     conn = sqlite3.connect(DB_PATH)
     stats = {
-        'total':      conn.execute("SELECT COUNT(*) FROM contacts WHERE statut != 'désinscrit'").fetchone()[0],
-        'avec_email': conn.execute("SELECT COUNT(*) FROM contacts WHERE email != '' AND statut != 'désinscrit'").fetchone()[0],
-        'avec_site':  conn.execute("SELECT COUNT(*) FROM contacts WHERE site_web != '' AND statut != 'désinscrit'").fetchone()[0],
+        'total':      conn.execute("SELECT COUNT(*) FROM contacts WHERE statut NOT IN ('désinscrit', 'archivé')").fetchone()[0],
+        'avec_email': conn.execute("SELECT COUNT(*) FROM contacts WHERE email != '' AND statut NOT IN ('désinscrit', 'archivé')").fetchone()[0],
+        'avec_site':  conn.execute("SELECT COUNT(*) FROM contacts WHERE site_web != '' AND statut NOT IN ('désinscrit', 'archivé')").fetchone()[0],
         'contactes':  conn.execute(
             "SELECT COUNT(*) FROM contacts WHERE statut IN ('contacté','1er contact','proposition','relancé','suivi','répondu','rdv','injoignable')"
         ).fetchone()[0],
         'par_naf': {},
     }
-    for r in conn.execute("SELECT naf, activite, COUNT(*) FROM contacts WHERE statut != 'désinscrit' GROUP BY naf ORDER BY naf"):
+    for r in conn.execute("SELECT naf, activite, COUNT(*) FROM contacts WHERE statut NOT IN ('désinscrit', 'archivé') GROUP BY naf ORDER BY naf"):
         stats['par_naf'][r[0]] = {'activite': r[1], 'count': r[2]}
     conn.close()
     return stats
@@ -179,7 +191,7 @@ def get_today_contacts():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
-        "SELECT * FROM contacts WHERE date_collecte LIKE ? AND statut != 'désinscrit' ORDER BY date_collecte DESC",
+        "SELECT * FROM contacts WHERE date_collecte LIKE ? AND statut NOT IN ('désinscrit', 'archivé') ORDER BY date_collecte DESC",
         (f'{today}%',)
     ).fetchall()
     conn.close()
@@ -188,7 +200,7 @@ def get_today_contacts():
 
 def get_naf_list():
     conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute("SELECT DISTINCT naf, activite FROM contacts WHERE statut != 'désinscrit' ORDER BY naf").fetchall()
+    rows = conn.execute("SELECT DISTINCT naf, activite FROM contacts WHERE statut NOT IN ('désinscrit', 'archivé') ORDER BY naf").fetchall()
     conn.close()
     return [{'naf': r[0], 'activite': r[1]} for r in rows]
 
@@ -209,7 +221,7 @@ def get_priorite_contacts(limit=15):
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         """SELECT * FROM contacts
-           WHERE statut NOT IN ('désinscrit','converti','écarté','pas intéressé','injoignable')
+           WHERE statut NOT IN ('désinscrit','archivé','converti','écarté','pas intéressé','injoignable')
            AND (email != '' OR site_web != '')"""
     ).fetchall()
     conn.close()
@@ -222,7 +234,8 @@ def get_priorite_contacts(limit=15):
 
 def update_contact(contact_id, updates):
     allowed = {'statut', 'notes', 'site_web', 'site_web_statut',
-                'email', 'email_statut', 'date_rappel'}
+                'email', 'email_statut', 'email_type', 'date_rappel',
+                'date_premier_contact', 'date_relance'}
     sets = {k: v for k, v in updates.items() if k in allowed}
     if not sets:
         return
@@ -261,7 +274,7 @@ def get_filtered_for_export(statut=None, naf=None, tranche=None, search=None):
     """Export with active filters applied."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    q = f"SELECT {', '.join(EXPORT_COLS)} FROM contacts WHERE statut != 'désinscrit'"
+    q = f"SELECT {', '.join(EXPORT_COLS)} FROM contacts WHERE statut NOT IN ('désinscrit', 'archivé')"
     params = []
     if statut:
         q += ' AND statut=?'; params.append(statut)

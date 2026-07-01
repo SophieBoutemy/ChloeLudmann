@@ -4,9 +4,12 @@ import os
 import re
 import smtplib
 import sqlite3
+import hashlib
+import hmac as _hmac
 import subprocess
 import uuid
 from datetime import datetime
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import wraps
 
@@ -74,20 +77,12 @@ with open(SECTEURS_PATH, encoding='utf-8') as _sf:
     SECTEURS_NAF = json.load(_sf)
 
 STATUT_OPTIONS = [
-    ('nouveau',         'Nouveau'),
-    ('qualifié',        'Qualifié'),
-    ('contacté',        'Contacté'),
-    ('1er contact',     '1er contact'),
-    ('proposition',     'Proposition envoyée'),
-    ('relancé',         'Relancé'),
-    ('suivi',           'En suivi'),
-    ('répondu',         'A répondu'),
-    ('rdv',             'RDV fixé'),
-    ('converti',        'Converti'),
-    ('injoignable',     'Injoignable'),
-    ('pas intéressé',   'Pas intéressé'),
-    ('écarté',          'Écarté'),
-    ('désinscrit',      'Désinscrit'),
+    ('désinscrit',          'Désinscrit'),
+    ('proposition envoyée', 'Proposition envoyée'),
+    ('rendez-vous fixé',    'Rendez-vous fixé'),
+    ('injoignable',         'Injoignable'),
+    ('pas intéressé',       'Pas intéressé'),
+    ('archivé',             'Archivé'),
 ]
 
 from prospection.storage import (
@@ -205,10 +200,57 @@ def get_serializer():
     return URLSafeTimedSerializer(app.secret_key)
 
 
+def _make_unsub_token(contact_id):
+    sig = _hmac.new(app.secret_key.encode(), str(contact_id).encode(), hashlib.sha256).hexdigest()[:8]
+    return f"{contact_id}-{sig}"
+
+
+def _verify_unsub_token(token):
+    try:
+        contact_id_str, sig = token.rsplit('-', 1)
+        contact_id = int(contact_id_str)
+        expected = _hmac.new(app.secret_key.encode(), str(contact_id).encode(), hashlib.sha256).hexdigest()[:8]
+        if _hmac.compare_digest(sig, expected):
+            return contact_id
+    except Exception:
+        pass
+    return None
+
+
+def _plain_to_html(text):
+    """Convert plain-text email body to minimal HTML with a clickable unsubscribe link."""
+    import re as _re
+    safe = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    safe = _re.sub(
+        r'Pour ne plus recevoir de messages\s*:\s*(https?://\S+)',
+        '<a href="\\1" style="color:#666666;text-decoration:none">Se désinscrire</a>',
+        safe,
+    )
+    safe = _re.sub(
+        r'(https?://mon-adjoint-ia\.fr/rgpd\.html)',
+        '<a href="\\1" style="color:#666666;text-decoration:none">\\1</a>',
+        safe,
+    )
+    safe = _re.sub(
+        r'(https?://)?mon-adjoint-ia\.fr(?![/\w])',
+        '<a href="https://mon-adjoint-ia.fr" style="color:#354626;text-decoration:underline">mon-adjoint-ia.fr</a>',
+        safe,
+    )
+    safe = safe.replace('\n', '<br>\n')
+    return (
+        '<!DOCTYPE html><html><head><meta charset="UTF-8"></head>'
+        '<body style="font-family:sans-serif;max-width:600px;margin:0 auto;'
+        'padding:24px;line-height:1.7;color:#222;font-size:15px">'
+        + safe + '</body></html>'
+    )
+
+
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get('logged_in'):
+            if request.is_json:
+                return jsonify({'error': 'Session expirée, veuillez vous reconnecter.'}), 401
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
@@ -1541,6 +1583,33 @@ def prospection_contact_update(contact_id):
 def prospection_desinscrit(contact_id):
     update_contact(contact_id, {'statut': 'désinscrit'})
     return redirect(request.form.get('next') or url_for('prospection_contacts'))
+@app.route('/prospection/unsubscribe/<token>')
+def prospection_unsubscribe(token):
+    contact_id = _verify_unsub_token(token)
+    if contact_id is None:
+        html = (
+            '<html><head><meta charset="UTF-8"><title>Lien invalide</title>'
+            '<style>body{font-family:sans-serif;max-width:520px;margin:80px auto;'
+            'padding:0 24px;color:#23242C}a{color:#354626}</style></head>'
+            '<body><h2>Lien invalide</h2>'
+            '<p>Ce lien de désinscription est invalide.</p>'
+            '<p><a href="https://mon-adjoint-ia.fr">mon-adjoint-ia.fr</a></p>'
+            '</body></html>'
+        )
+        return html, 400
+    update_contact(contact_id, {'statut': 'désinscrit'})
+    html = (
+        '<html><head><meta charset="UTF-8"><title>Désinscription confirmée</title>'
+        '<style>body{font-family:sans-serif;max-width:520px;margin:80px auto;'
+        'padding:0 24px;color:#23242C}a{color:#354626}</style></head>'
+        '<body><h2>Désinscription confirmée</h2>'
+        '<p>Votre adresse a bien été retirée de notre liste de prospection. '
+        'Vous ne recevrez plus aucun message de notre part.</p>'
+        '<p><a href="https://mon-adjoint-ia.fr">mon-adjoint-ia.fr</a></p>'
+        '</body></html>'
+    )
+    return html, 200
+
 
 
 @app.route('/prospection/contacts/<int:contact_id>/draft', methods=['POST'])
@@ -1551,7 +1620,9 @@ def prospection_draft(contact_id):
         return jsonify({'error': 'Contact introuvable'}), 404
     data = request.get_json(force=True) or {}
     try:
-        draft = generate_draft(contact, data.get('email_type', 'premier_contact'))
+        token = _make_unsub_token(contact_id)
+        unsubscribe_url = url_for('prospection_unsubscribe', token=token, _external=True)
+        draft = generate_draft(contact, data.get('email_type', 'premier_contact'), unsubscribe_url=unsubscribe_url)
         return jsonify(draft)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1563,8 +1634,8 @@ def prospection_send(contact_id):
     contact = get_contact_by_id(contact_id)
     if not contact:
         return jsonify({'error': 'Contact introuvable'}), 404
-    if contact.get('statut') == 'désinscrit':
-        return jsonify({'error': 'Ce contact est désinscrit'}), 403
+    if contact.get('statut') in ('désinscrit', 'archivé'):
+        return jsonify({'error': 'Ce contact est désinscrit ou archivé'}), 403
     if not contact.get('email'):
         return jsonify({'error': "Pas d'adresse email pour ce contact"}), 400
     profile = load_profile()
@@ -1583,13 +1654,18 @@ def prospection_send(contact_id):
     smtp_host = profile.get('smtp_host', 'ssl0.ovh.net')
     smtp_port = int(profile.get('smtp_port', 465))
     sender_name = f"{profile.get('prenom', '')} {profile.get('nom', '')}".strip()
-    _type_status = {'premier_contact': '1er contact', 'relance': 'relancé', 'suivi': 'suivi'}
-    new_statut = _type_status.get(data.get('email_type', 'premier_contact'), '1er contact')
+    new_statut = 'contacté'
     try:
-        msg = MIMEText(body, 'plain', 'utf-8')
+        msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = f'{sender_name} <{smtp_user}>' if sender_name else smtp_user
         msg['To'] = contact['email']
+        _unsub_token = _make_unsub_token(contact_id)
+        _unsub_url = url_for('prospection_unsubscribe', token=_unsub_token, _external=True)
+        msg['List-Unsubscribe'] = f'<{_unsub_url}>'
+        msg['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        msg.attach(MIMEText(_plain_to_html(body), 'html', 'utf-8'))
         with smtplib.SMTP_SSL(smtp_host, smtp_port) as s:
             s.login(smtp_user, smtp_pass)
             s.send_message(msg)
@@ -1597,7 +1673,9 @@ def prospection_send(contact_id):
         note = f"Email envoyé le {datetime.now().strftime('%d/%m/%Y')} : {subject}"
         existing = contact.get('notes', '')
         new_notes = (existing + '\n' + note).strip() if existing else note
-        update_contact(contact_id, {'statut': new_statut, 'notes': new_notes})
+        today_str = datetime.now().strftime('%d/%m/%Y')
+        date_fields = {'date_premier_contact': today_str} if not contact.get('date_premier_contact') else {'date_relance': today_str}
+        update_contact(contact_id, {'statut': new_statut, 'notes': new_notes, **date_fields})
         return jsonify({'ok': True, 'quota': new_count, 'limit': daily_limit})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1609,17 +1687,18 @@ def prospection_mark_sent(contact_id):
     contact = get_contact_by_id(contact_id)
     if not contact:
         return jsonify({'error': 'Contact introuvable'}), 404
-    if contact.get('statut') == 'désinscrit':
-        return jsonify({'error': 'Ce contact est désinscrit'}), 403
+    if contact.get('statut') in ('désinscrit', 'archivé'):
+        return jsonify({'error': 'Ce contact est désinscrit ou archivé'}), 403
     data = request.get_json(force=True) or {}
     email_type = data.get('email_type', 'premier_contact')
-    _type_status = {'premier_contact': '1er contact', 'relance': 'relancé', 'suivi': 'suivi'}
-    new_statut = _type_status.get(email_type, '1er contact')
+    new_statut = 'contacté'
     type_label = EMAIL_TYPES.get(email_type, email_type)
     note = f"Marqué envoyé le {datetime.now().strftime('%d/%m/%Y')} ({type_label})"
     existing = contact.get('notes', '')
     new_notes = (existing + '\n' + note).strip() if existing else note
-    update_contact(contact_id, {'statut': new_statut, 'notes': new_notes})
+    today_str = datetime.now().strftime('%d/%m/%Y')
+    date_fields = {'date_premier_contact': today_str} if not contact.get('date_premier_contact') else {'date_relance': today_str}
+    update_contact(contact_id, {'statut': new_statut, 'notes': new_notes, **date_fields})
     return jsonify({'ok': True, 'statut': new_statut})
 
 

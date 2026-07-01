@@ -58,9 +58,9 @@ def save_profile(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def generate_draft(contact, email_type="premier_contact"):
-    if contact.get('statut') == 'désinscrit':
-        raise ValueError("Ce contact est désinscrit et ne peut pas être relancé.")
+def generate_draft(contact, email_type="premier_contact", unsubscribe_url=None):
+    if contact.get('statut') in ('désinscrit', 'archivé'):
+        raise ValueError(f"Ce contact est {contact.get('statut')} et ne peut pas être relancé.")
 
     profile = load_profile()
     type_label = EMAIL_TYPES.get(email_type, "Premier contact")
@@ -123,4 +123,13 @@ def generate_draft(contact, email_type="premier_contact"):
         inner = lines[1:-1] if lines[-1].strip() == '```' else lines[1:]
         raw = '\n'.join(inner).strip()
 
-    return json.loads(raw)
+    result = json.loads(raw)
+    legal = (
+        "\n\n---\n"
+        "Vos coordonnées professionnelles ont été collectées via une source publique."
+        " Plus d'informations et droit d'opposition : https://mon-adjoint-ia.fr/rgpd.html"
+    )
+    if unsubscribe_url:
+        legal = f"\n\nPour ne plus recevoir de messages : {unsubscribe_url}" + legal
+    result['body'] = result['body'].rstrip() + legal
+    return result

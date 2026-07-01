@@ -61,12 +61,18 @@ def _parse_company(item, keyword=''):
     }
 
 
-def search_companies_be(keywords, provinces=None, max_results=50):
+def search_companies_be(keywords, provinces=None, max_results=50, seen=None, offsets=None):
     """
     keywords : list of search terms
     provinces: list of province codes (e.g. ['BRU', 'LGE']) or None for all
+    seen     : optional external set of enterprise numbers already processed (mutated in-place)
+    offsets  : optional dict {(kw, province): next_start_offset} for pagination across calls
+               (mutated in-place; value -1 means that combo is exhausted)
     """
-    seen = set()
+    if seen is None:
+        seen = set()
+    if offsets is None:
+        offsets = {}
     results = []
 
     province_list = provinces if provinces else [None]
@@ -77,39 +83,52 @@ def search_companies_be(keywords, provinces=None, max_results=50):
         for province in province_list:
             if len(results) >= max_results:
                 break
-            params = {
-                'query': kw,
-                'lang': 'fr',
-                'start': 0,
-                'size': min(max_results - len(results), 50),
-            }
-            if province:
-                params['province'] = province
-            try:
-                r = requests.get(KBO_URL, params=params, timeout=12)
-                r.raise_for_status()
-                data = r.json()
-                items = (
-                    data if isinstance(data, list)
-                    else data.get('enterprises', data.get('hits', data.get('results', [])))
-                )
-                for item in items:
-                    ent_no = re.sub(r'[^0-9]', '',
-                                    item.get('enterpriseNumber') or item.get('id') or '')
-                    if not ent_no or ent_no in seen:
-                        continue
-                    if provinces and not province:
-                        item_prov = (item.get('address') or {}).get('province', '')
-                        if item_prov and item_prov not in provinces:
-                            continue
-                    seen.add(ent_no)
-                    parsed = _parse_company(item, kw)
-                    if parsed['nom_entreprise']:
-                        results.append(parsed)
-                    if len(results) >= max_results:
+            key = (kw, province)
+            if offsets.get(key) == -1:
+                continue  # this combo is exhausted
+            offset = offsets.get(key, 0)
+            while len(results) < max_results:
+                params = {
+                    'query': kw,
+                    'lang': 'fr',
+                    'start': offset,
+                    'size': 50,
+                }
+                if province:
+                    params['province'] = province
+                try:
+                    r = requests.get(KBO_URL, params=params, timeout=12)
+                    r.raise_for_status()
+                    data = r.json()
+                    items = (
+                        data if isinstance(data, list)
+                        else data.get('enterprises', data.get('hits', data.get('results', [])))
+                    )
+                    if not items:
+                        offsets[key] = -1
                         break
-            except Exception:
-                pass
-            time.sleep(0.2)
+                    for item in items:
+                        ent_no = re.sub(r'[^0-9]', '',
+                                        item.get('enterpriseNumber') or item.get('id') or '')
+                        if not ent_no or ent_no in seen:
+                            continue
+                        if provinces and not province:
+                            item_prov = (item.get('address') or {}).get('province', '')
+                            if item_prov and item_prov not in provinces:
+                                continue
+                        seen.add(ent_no)
+                        parsed = _parse_company(item, kw)
+                        if parsed['nom_entreprise']:
+                            results.append(parsed)
+                        if len(results) >= max_results:
+                            break
+                    offset += len(items)
+                    offsets[key] = offset
+                    if len(items) < 50:
+                        offsets[key] = -1  # last page reached
+                        break
+                except Exception:
+                    break
+                time.sleep(0.2)
 
     return results[:max_results]

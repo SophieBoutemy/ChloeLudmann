@@ -35,12 +35,13 @@ def _parse_firm(firm):
     }
 
 
-def search_companies_ch(keywords, cantons=None, max_results=50):
+def search_companies_ch(keywords, cantons=None, max_results=50, seen=None):
     """
     keywords: list of search terms (e.g. ['boulangerie', 'pâtisserie'])
     cantons : list of 2-letter codes (e.g. ['VD', 'GE']) or None for all
     """
-    seen = set()
+    if seen is None:
+        seen = set()
     results = []
 
     canton_list = cantons if cantons else [None]
@@ -54,7 +55,7 @@ def search_companies_ch(keywords, cantons=None, max_results=50):
             payload = {
                 'name':       kw,
                 'activeOnly': True,
-                'maxEntries': min(max_results - len(results), 50),
+                'maxEntries': 50,
             }
             if canton:
                 payload['canton'] = canton

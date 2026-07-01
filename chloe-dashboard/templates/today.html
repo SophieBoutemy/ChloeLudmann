@@ -250,7 +250,7 @@ function updateStatut(sel) {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({statut: sel.value}),
   })
-  .then(r => r.json())
+  .then(r => { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
   .then(() => {
     sel.classList.remove('saving');
     sel.classList.add('saved');
@@ -291,7 +291,7 @@ function generateDraft() {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({email_type: document.getElementById('draft-type').value}),
   })
-  .then(r => r.json())
+  .then(r => { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
   .then(d => {
     if (btn) { btn.disabled = false; btn.textContent = 'Générer avec l\'IA'; }
     if (btn2) btn2.disabled = false;

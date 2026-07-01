@@ -64,10 +64,11 @@ def _run(naf_codes, departements, max_results, enrichissement, tranche_effectifs
     })
     try:
         seen = set()
-        valid_count = 0
+        new_count = 0
+        updated_count = 0
 
-        while valid_count < max_results:
-            needed = max_results - valid_count
+        while new_count < max_results:
+            needed = max_results - new_count
             companies = search_companies(naf_codes, departements or None, needed,
                                          tranche_effectifs, seen)
             if not companies:
@@ -76,12 +77,15 @@ def _run(naf_codes, departements, max_results, enrichissement, tranche_effectifs
             for company in companies:
                 if enrichissement:
                     company = enrich_contact(company)
-                upsert_contact(company)
-                if not enrichissement or company.get('site_web') or company.get('email'):
-                    valid_count += 1
+                result = upsert_contact(company)
+                has_contact = not enrichissement or company.get('site_web') or company.get('email')
+                if result == 'created' and has_contact:
+                    new_count += 1
+                elif result == 'updated':
+                    updated_count += 1
                 _save({
-                    'running': True, 'progress': valid_count, 'total': max_results,
-                    'message': f'{valid_count}/{max_results} -- {company["nom_entreprise"]}',
+                    'running': True, 'progress': new_count, 'total': max_results,
+                    'message': f'{new_count} nouveau(x), {updated_count} mis à jour — {company["nom_entreprise"]}',
                     'finished': None,
                     'search_params': params_label,
                 })
@@ -90,11 +94,14 @@ def _run(naf_codes, departements, max_results, enrichissement, tranche_effectifs
                 break  # API exhausted, no more results available
 
         removed = delete_contacts_empty()
-        final_msg = f'Termine -- {valid_count} contacts valides traites'
+        parts = [f'{new_count} nouveau(x) contact(s)']
+        if updated_count:
+            parts.append(f'{updated_count} déjà connu(s) mis à jour')
         if removed:
-            final_msg += f' ({removed} sans email ni site supprimes)'
+            parts.append(f'{removed} sans email ni site supprimé(s)')
+        final_msg = 'Terminé — ' + ', '.join(parts)
         _save({
-            'running': False, 'progress': valid_count, 'total': max_results,
+            'running': False, 'progress': new_count, 'total': max_results,
             'message': final_msg,
             'finished': datetime.now().strftime('%d/%m/%Y %H:%M'),
             'search_params': params_label,
@@ -111,37 +118,50 @@ def _run_ch(keywords, cantons, max_results, enrichissement, params_label):
     from .scraper_ch import search_companies_ch
     init_db()
     _save({
-        'running': True, 'progress': 0, 'total': 0,
+        'running': True, 'progress': 0, 'total': max_results,
         'message': 'Interrogation de Zefix (Suisse)...',
         'started': datetime.now().strftime('%d/%m/%Y %H:%M'),
         'finished': None,
         'search_params': params_label,
     })
     try:
-        companies = search_companies_ch(keywords, cantons or None, max_results)
-        total = len(companies)
-        _save({
-            'running': True, 'progress': 0, 'total': total,
-            'message': f'{total} entreprises suisses trouvees -- enrichissement en cours...',
-            'finished': None,
-            'search_params': params_label,
-        })
-        for i, company in enumerate(companies):
-            if enrichissement:
-                company = enrich_contact(company)
-            upsert_contact(company)
-            _save({
-                'running': True, 'progress': i + 1, 'total': total,
-                'message': f'{i + 1}/{total} -- {company["nom_entreprise"]}',
-                'finished': None,
-                'search_params': params_label,
-            })
+        seen = set()
+        new_count = 0
+        updated_count = 0
+
+        while new_count < max_results:
+            needed = max_results - new_count
+            companies = search_companies_ch(keywords, cantons or None, needed, seen=seen)
+            if not companies:
+                break
+
+            for company in companies:
+                if enrichissement:
+                    company = enrich_contact(company)
+                result = upsert_contact(company)
+                if result == 'created':
+                    new_count += 1
+                elif result == 'updated':
+                    updated_count += 1
+                _save({
+                    'running': True, 'progress': new_count, 'total': max_results,
+                    'message': f'{new_count} nouveau(x), {updated_count} mis à jour — {company["nom_entreprise"]}',
+                    'finished': None,
+                    'search_params': params_label,
+                })
+
+            if len(companies) < needed:
+                break  # API exhausted, no more results available
+
         removed = delete_contacts_empty()
-        final_msg = f'Termine (Suisse) -- {total} contacts traites'
+        parts = [f'{new_count} nouveau(x) contact(s) (Suisse)']
+        if updated_count:
+            parts.append(f'{updated_count} déjà connu(s) mis à jour')
         if removed:
-            final_msg += f' ({removed} sans email ni site supprimes)'
+            parts.append(f'{removed} sans email ni site supprimé(s)')
+        final_msg = 'Terminé — ' + ', '.join(parts)
         _save({
-            'running': False, 'progress': total, 'total': total,
+            'running': False, 'progress': new_count, 'total': max_results,
             'message': final_msg,
             'finished': datetime.now().strftime('%d/%m/%Y %H:%M'),
             'search_params': params_label,
@@ -195,37 +215,51 @@ def _run_be(keywords, provinces, max_results, enrichissement, params_label):
     from .scraper_be import search_companies_be
     init_db()
     _save({
-        'running': True, 'progress': 0, 'total': 0,
+        'running': True, 'progress': 0, 'total': max_results,
         'message': 'Interrogation de la BCE (Belgique)...',
         'started': datetime.now().strftime('%d/%m/%Y %H:%M'),
         'finished': None,
         'search_params': params_label,
     })
     try:
-        companies = search_companies_be(keywords, provinces or None, max_results)
-        total = len(companies)
-        _save({
-            'running': True, 'progress': 0, 'total': total,
-            'message': f'{total} entreprises belges trouvees -- enrichissement en cours...',
-            'finished': None,
-            'search_params': params_label,
-        })
-        for i, company in enumerate(companies):
-            if enrichissement:
-                company = enrich_contact(company)
-            upsert_contact(company)
-            _save({
-                'running': True, 'progress': i + 1, 'total': total,
-                'message': f'{i + 1}/{total} -- {company["nom_entreprise"]}',
-                'finished': None,
-                'search_params': params_label,
-            })
+        seen = set()
+        offsets = {}
+        new_count = 0
+        updated_count = 0
+
+        while new_count < max_results:
+            needed = max_results - new_count
+            companies = search_companies_be(keywords, provinces or None, needed, seen=seen, offsets=offsets)
+            if not companies:
+                break
+
+            for company in companies:
+                if enrichissement:
+                    company = enrich_contact(company)
+                result = upsert_contact(company)
+                if result == 'created':
+                    new_count += 1
+                elif result == 'updated':
+                    updated_count += 1
+                _save({
+                    'running': True, 'progress': new_count, 'total': max_results,
+                    'message': f'{new_count} nouveau(x), {updated_count} mis à jour — {company["nom_entreprise"]}',
+                    'finished': None,
+                    'search_params': params_label,
+                })
+
+            if len(companies) < needed:
+                break  # API exhausted, no more results available
+
         removed = delete_contacts_empty()
-        final_msg = f'Termine (Belgique) -- {total} contacts traites'
+        parts = [f'{new_count} nouveau(x) contact(s) (Belgique)']
+        if updated_count:
+            parts.append(f'{updated_count} déjà connu(s) mis à jour')
         if removed:
-            final_msg += f' ({removed} sans email ni site supprimes)'
+            parts.append(f'{removed} sans email ni site supprimé(s)')
+        final_msg = 'Terminé — ' + ', '.join(parts)
         _save({
-            'running': False, 'progress': total, 'total': total,
+            'running': False, 'progress': new_count, 'total': max_results,
             'message': final_msg,
             'finished': datetime.now().strftime('%d/%m/%Y %H:%M'),
             'search_params': params_label,

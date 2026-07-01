@@ -1,45 +1,43 @@
 import re
+import os
 import subprocess
 import time
-import unicodedata
 import requests
-from urllib.parse import quote_plus, urljoin, urlparse
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
-_EMAIL_RE = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+_SOCIETEINFO_KEY = os.getenv('SOCIETEINFO_API_KEY_CHLOE', '')
 
-_SKIP_DIRS = {
-    # Registres & données légales
-    'pappers.fr', 'societe.com', 'infogreffe.fr', 'verif.com',
-    'kompass.com', 'manageo.fr', 'annuaire-entreprises.data.gouv.fr',
-    'societe.ninja', 'bodacc.fr', 'portail-ie.fr', 'europages.fr',
-    'hoodspot.fr', 'cylex.fr', 'annuaire.', 'laposte.net',
-    # Moteurs de recherche & navigateurs
-    'google.', 'bing.com', 'duckduckgo.com', 'yahoo.',
-    # Réseaux sociaux
-    'facebook.com', 'instagram.com', 'linkedin.com', 'twitter.com',
-    'youtube.com', 'tiktok.com', 'pinterest.', 'snapchat.com',
-    'x.com', 'threads.net', 'discord.com',
-    # Encyclopédies & références
-    'wikipedia.', 'wikimedia.', 'wikidata.',
-    # Médias nationaux & magazines lifestyle
-    'lefigaro.fr', 'lemonde.fr', 'leparisien.fr', 'bfmtv.com',
-    'cnews.fr', 'rtl.fr', 'europe1.fr', '20minutes.fr', 'actu.fr',
-    'journaldesfemmes.fr', 'aufeminin.com', 'parents.fr', 'femme',
-    'marmiton.org', 'doctolib.fr', 'allocine.fr', 'senscritique.com',
-    'imdb.com', 'marie.fr', 'elle.fr', 'cosmopolitan.fr',
-    'ouest-france.fr', 'maville.com', 'francetvinfo.fr',
-    # Outils tech non-commerciaux
-    'github.com', 'gitlab.com', 'stackoverflow.com', 'julialang.org',
-    'microsoft.com', 'cloud.microsoft', 'office.com',
-    'apple.com', 'amazon.', 'ebay.', 'etsy.com',
-    # Pages jaunes variantes
-    'pages.jaunes.fr', 'pagesjaunes.fr',
-    # Divers manifestement hors-sujet
-    'ameli.fr', 'service-public.fr', 'impots.gouv.fr',
-}
 _SKIP_EMAIL_DOMAINS = {'example.com', 'test.com', 'domain.com', 'sentry.io', 'wixpress.com'}
-_SKIP_EMAIL_PREFIXES = ('noreply', 'no-reply', 'donotreply', 'mailer', 'bounce', 'admin@admin')
+_SKIP_EMAIL_PREFIXES = ('noreply', 'no-reply', 'donotreply', 'mailer', 'bounce', 'admin@admin',
+                       'mon.adresse', 'exemple', 'test', 'demo')
+
+_GENERIC_PREFIXES = frozenset({
+    'contact', 'info', 'hello', 'bonjour', 'accueil', 'welcome', 'mail',
+    'email', 'support', 'aide', 'help', 'service', 'services',
+    'commercial', 'vente', 'ventes', 'sales', 'direction', 'bureau',
+    'secretariat', 'administration', 'admin', 'comptabilite', 'compta',
+    'facture', 'factures', 'invoice', 'rh', 'recrutement', 'emploi',
+    'communication', 'presse', 'media', 'marketing', 'pro',
+    'reservation', 'booking', 'rdv', 'agenda', 'newsletter', 'news',
+    'webmaster', 'postmaster', 'hostmaster', 'root', 'office', 'general',
+    'infos', 'equipe', 'team',
+})
+
+
+def classify_email(email):
+    """Return 'nominatif', 'generique', or 'inconnu'."""
+    prefix = email.split('@')[0].lower()
+    prefix_clean = re.sub(r'\d+$', '', prefix)
+    if prefix_clean in _GENERIC_PREFIXES:
+        return 'generique'
+    for sep in ('.', '-', '_'):
+        if sep in prefix_clean:
+            parts = [p for p in prefix_clean.split(sep) if p]
+            if len(parts) >= 2 and all(len(p) >= 1 and p.isalpha() for p in parts):
+                return 'nominatif'
+    return 'inconnu'
+
 
 _HEADERS = {
     'User-Agent': (
@@ -60,6 +58,8 @@ def _clean_email(raw):
     if any(prefix.startswith(p) for p in _SKIP_EMAIL_PREFIXES):
         return None
     if re.search(r'\.(png|jpg|gif|css|js|svg|ico|woff)$', domain):
+        return None
+    if any(s in domain for s in ('sentry.io', 'ingest.')):
         return None
     if len(prefix) < 2 or len(domain) < 4:
         return None
@@ -96,111 +96,62 @@ def verify_email(email):
     return 'vérifié'  # True or None → accepted by default
 
 
-def _find_website(company_name, nom_dirigeant='', is_ei=False):
-    """Search Bing for the company's official website."""
-    q = company_name
-    if nom_dirigeant:
-        q += f' {nom_dirigeant}'
-    q += ' site officiel'
-    url = f'https://www.bing.com/search?q={quote_plus(q)}&setlang=fr&cc=FR'
+_EMAIL_RE = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+
+
+def _find_website(siren):
+    """Fetch official website and email from Societeinfo API (lookup by SIREN)."""
+    if not siren or not _SOCIETEINFO_KEY:
+        return '', ''
     try:
-        r = requests.get(url, headers=_HEADERS, timeout=8)
-        soup = BeautifulSoup(r.text, 'html.parser')
-        for item in soup.select('li.b_algo'):
-            cite = item.select_one('cite')
-            if not cite:
-                continue
-            raw = cite.get_text().split('›')[0].strip()
-            if not raw:
-                continue
-            if not raw.startswith('http'):
-                raw = 'https://' + raw
-            if any(d in raw for d in _SKIP_DIRS):
-                continue
-            # Always require domain to match company or director name.
-            # Better to return nothing than a wrong site.
-            if _domain_ok(raw, company_name):
-                return raw.rstrip('/')
-            if nom_dirigeant and _domain_ok(raw, nom_dirigeant):
-                return raw.rstrip('/')
+        r = requests.get(
+            'https://societeinfo.com/app/rest/api/v2/company.json',
+            params={'registration_number': siren, 'key': _SOCIETEINFO_KEY},
+            timeout=8,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if data.get('success'):
+                result = data['result']
+                url = result.get('web_infos', {}).get('website_url', '')
+                email = result.get('contacts', {}).get('email', '')
+                return url.rstrip('/') if url else '', email or ''
     except Exception:
         pass
-    return ''
+    return '', ''
 
 
 _MENTIONS_KEYWORDS = ('mention', 'légal', 'legal', 'legale', 'legales', 'cgu', 'cgv')
 
-_STOP_WORDS = {
-    # Formes juridiques
-    'sarl', 'eurl', 'sas', 'sasu', 'snc', 'sci', 'scop', 'scp',
-    'selas', 'selarl', 'eirl', 'sprl',
-    # Articles et prépositions courts
-    'les', 'des', 'une', 'avec', 'dans', 'pour', 'chez', 'sur', 'sous', 'par',
-    # Mots génériques entreprise
-    'france', 'french', 'groupe', 'group', 'holding',
-    'service', 'services', 'edition', 'editions',
-    'solution', 'solutions', 'technology', 'technologies',
-    'international', 'consulting', 'conseil', 'management',
-    'partners', 'invest', 'investissement', 'distribution',
-    # Mots de secteur trop génériques
-    'laboratoire', 'laboratoires', 'restaurant', 'maison',
-    # Suffixes/parasites fréquents dans les noms INSEE
-    'com', 'www',
-}
+
+def _collect_emails_from_soup(soup, raw_text):
+    """Return all valid emails from a page, mailto links first."""
+    seen, result = set(), []
+    for a in soup.find_all('a', href=True):
+        if a['href'].startswith('mailto:'):
+            e = _clean_email(a['href'][7:])
+            if e and e not in seen:
+                seen.add(e)
+                result.append(e)
+    for raw in _EMAIL_RE.findall(raw_text):
+        e = _clean_email(raw)
+        if e and e not in seen:
+            seen.add(e)
+            result.append(e)
+    return result
 
 
-def _asciify(s):
-    s = unicodedata.normalize('NFKD', s.lower())
-    return re.sub(r'[^a-z0-9]', '', ''.join(c for c in s if not unicodedata.combining(c)))
-
-
-def _sig_words(company_name):
-    """Extract significant words (≥4 chars, not stop words) from a company name."""
-    name = re.sub(r'\([^)]*\)', ' ', company_name)
-    parts = re.split(r'[\s\-\.\*\/\_&+]+', name)
-    return [w for p in parts if len(w := _asciify(p)) >= 4 and w not in _STOP_WORDS]
-
-
-def _domain_ok(url, name):
-    """Return True if the domain plausibly belongs to this name.
-
-    Matching rules (in order):
-    1. A sig-word exactly equals a hyphen-segment of the domain (e.g. "artellic" in "artellic-shop")
-    2. The domain starts with a sig-word of ≥5 chars (e.g. "confiserie..." starts with "confiserie")
-    3. A sig-word of ≥8 chars is a substring AND represents ≥40 % of the domain length
-
-    Never matches by suffix (avoids "femmes" matching "journaldesfemmes").
-    """
-    words = _sig_words(name)
-    if not words:
-        return False
-    try:
-        host = re.sub(r'^www\.', '', urlparse(url).netloc.lower())
-        domain_part = _asciify(host.split('.')[0])
-        segments = {_asciify(s) for s in host.split('.')[0].split('-') if s}
-    except Exception:
-        return False
-    for w in words:
-        if w in segments:
-            return True
-        if len(w) >= 5 and domain_part.startswith(w):
-            return True
-        if len(w) >= 8 and w in domain_part and len(w) >= len(domain_part) * 0.40:
-            return True
-    return False
+def _best_email(candidates):
+    """Return (email, email_type) preferring nominatif > generique > inconnu."""
+    for typ in ('nominatif', 'generique', 'inconnu'):
+        for e in candidates:
+            if classify_email(e) == typ:
+                return e, typ
+    return '', ''
 
 
 def _email_from_soup(soup, raw_text):
-    for a in soup.find_all('a', href=True):
-        if a['href'].startswith('mailto:'):
-            cleaned = _clean_email(a['href'][7:])
-            if cleaned:
-                return cleaned
-    for raw in _EMAIL_RE.findall(raw_text):
-        cleaned = _clean_email(raw)
-        if cleaned:
-            return cleaned
-    return ''
+    return _best_email(_collect_emails_from_soup(soup, raw_text))[0]
 
 
 def _find_mentions_url(soup, base_url):
@@ -212,43 +163,56 @@ def _find_mentions_url(soup, base_url):
     return ''
 
 
-def _extract_email(url):
+def _collect_emails_from_url(url):
+    """Fetch a URL and return all valid emails found."""
     if not url:
-        return ''
+        return []
     try:
         r = requests.get(url, headers=_HEADERS, timeout=6, allow_redirects=True)
-        return _email_from_soup(BeautifulSoup(r.text, 'html.parser'), r.text)
+        return _collect_emails_from_soup(BeautifulSoup(r.text, 'html.parser'), r.text)
     except Exception:
-        return ''
+        return []
+
+
+def _extract_email(url):
+    return _best_email(_collect_emails_from_url(url))[0]
 
 
 def enrich_contact(contact):
     is_ei = bool(contact.get('est_ei'))
 
     if not contact.get('site_web'):
-        site = _find_website(contact['nom_entreprise'], contact.get('nom_dirigeant', ''), is_ei=is_ei)
+        site, api_email = _find_website(contact.get('siren', ''))
         contact['site_web'] = site
         contact['site_web_statut'] = 'à vérifier' if site else ''
+        if api_email and not contact.get('email'):
+            contact['email'] = api_email
         time.sleep(0.4)
 
     if contact.get('site_web') and not contact.get('email'):
         base = contact['site_web'].rstrip('/')
-        email = ''
+        all_emails = []
         mentions_url = ''
         try:
             r = requests.get(base, headers=_HEADERS, timeout=6, allow_redirects=True)
             soup = BeautifulSoup(r.text, 'html.parser')
-            email = _email_from_soup(soup, r.text)
-            if not email:
+            all_emails = _collect_emails_from_soup(soup, r.text)
+            if not all_emails:
                 mentions_url = _find_mentions_url(soup, base)
         except Exception:
             pass
-        if not email:
-            email = _extract_email(base + '/contact')
-        if not email and mentions_url:
-            email = _extract_email(mentions_url)
+        if not any(classify_email(e) == 'nominatif' for e in all_emails):
+            all_emails += _collect_emails_from_url(base + '/contact')
+        if mentions_url and not any(classify_email(e) == 'nominatif' for e in all_emails):
+            all_emails += _collect_emails_from_url(mentions_url)
+        seen_set = set()
+        deduped = [e for e in all_emails if not (e in seen_set or seen_set.add(e))]
+        email, email_type = _best_email(deduped)
         contact['email'] = email
+        contact['email_type'] = email_type
 
     contact['email_statut'] = verify_email(contact['email']) if contact.get('email') else ''
+    if 'email_type' not in contact:
+        contact['email_type'] = classify_email(contact['email']) if contact.get('email') else ''
 
     return contact

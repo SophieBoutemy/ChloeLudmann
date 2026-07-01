@@ -63,7 +63,6 @@ thead th {
 tbody td { padding: .6rem 1rem; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover td { background: #faf9f7; }
-tbody tr.row-rappel-due td { background: #fff8ed !important; }
 .td-name { font-weight: 500; max-width: 200px; }
 .td-name small { display: block; color: var(--muted); font-weight: 400; font-size: .75rem; margin-top: .1rem; }
 .td-act  { color: var(--muted); max-width: 140px; }
@@ -145,21 +144,6 @@ tbody tr.row-rappel-due td { background: #fff8ed !important; }
 .statut-select:focus { border-color: var(--green); }
 .statut-select.saving { opacity: .6; }
 .statut-select.saved  { border-color: #4ade80; background: #f0fdf4; }
-.rappel-input {
-  padding: .15rem .3rem;
-  border: 1.5px solid var(--border);
-  border-radius: 5px;
-  font-size: .72rem;
-  font-family: 'Inter', sans-serif;
-  color: var(--text);
-  background: #fafaf9;
-  outline: none;
-  width: 118px;
-  margin-top: .3rem;
-  display: block;
-}
-.rappel-input:focus { border-color: var(--green); }
-.rappel-due-label { font-size: .68rem; color: #dc2626; font-weight: 600; font-family: 'Karla', sans-serif; display: block; margin-top: .1rem; }
 .td-check { width: 2rem; padding-left: .9rem !important; }
 .th-check { width: 2rem; padding-left: .9rem !important; }
 .row-check, #check-all { width: 15px; height: 15px; accent-color: var(--green); cursor: pointer; vertical-align: middle; }
@@ -361,14 +345,15 @@ tbody tr.row-rappel-due td { background: #fff8ed !important; }
         <th>Localisation</th>
         <th>Email</th>
         <th>Site web</th>
-        <th>Statut / Rappel</th>
+        <th>1er contact</th>
+        <th>Relance</th>
+        <th>Statut</th>
         <th>Collecté</th>
       </tr>
     </thead>
     <tbody>
       {% for c in contacts %}
-      {% set is_due = c.date_rappel and c.date_rappel <= today %}
-      <tr{% if is_due %} class="row-rappel-due"{% endif %}>
+      <tr>
         <td class="td-check"><input type="checkbox" class="row-check" value="{{ c.id }}"></td>
         <td class="td-name">
           {{ c.nom_entreprise }}
@@ -415,19 +400,15 @@ tbody tr.row-rappel-due td { background: #fff8ed !important; }
           <span class="no-val">—</span>
           {% endif %}
         </td>
+        <td class="td-date" data-field="date_premier_contact" data-id="{{ c.id }}">{{ c.date_premier_contact or '—' }}</td>
+        <td class="td-date">{{ c.date_relance or '—' }}</td>
         <td>
           <select class="statut-select" data-id="{{ c.id }}" onchange="updateStatut(this)">
+            <option value="">—</option>
             {% for val, label in statut_options %}
             <option value="{{ val }}" {% if c.statut == val %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
-          <input type="date" class="rappel-input"
-                 value="{{ c.date_rappel or '' }}"
-                 title="Date de rappel"
-                 onchange="updateRappel(this, {{ c.id }})">
-          {% if is_due %}
-          <span class="rappel-due-label">⚠ Rappel dû</span>
-          {% endif %}
           {% if c.statut != 'désinscrit' %}
           <form method="post" action="{{ url_for('prospection_desinscrit', contact_id=c.id) }}"
                 style="display:inline;margin-top:.25rem">
@@ -581,7 +562,7 @@ function updateStatut(sel) {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({statut: sel.value}),
   })
-  .then(function(r){ return r.json(); })
+  .then(function(r){ if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
   .then(function(){
     sel.classList.remove('saving');
     sel.classList.add('saved');
@@ -590,13 +571,6 @@ function updateStatut(sel) {
   .catch(function(){ sel.classList.remove('saving'); });
 }
 
-function updateRappel(input, id) {
-  fetch('/prospection/contacts/' + id, {
-    method: 'PATCH',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({date_rappel: input.value || null}),
-  });
-}
 
 function verifySite(id, btn) {
   fetch('/prospection/contacts/' + id, {
@@ -604,7 +578,7 @@ function verifySite(id, btn) {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({site_web_statut: 'vérifié'}),
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
   .then(function() {
     var badge = document.getElementById('site-badge-' + id);
     if (badge) { badge.textContent = '✓ vérifié'; badge.className = 'site-badge site-badge--ok'; }
@@ -654,7 +628,7 @@ function generateDraft() {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({email_type: document.getElementById('draft-type').value}),
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
   .then(function(d) {
     if (btn) { btn.disabled = false; btn.textContent = "Générer avec l'IA"; }
     if (btn2) { btn2.disabled = false; }
@@ -708,7 +682,7 @@ function markSent() {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({email_type: emailType}),
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
   .then(function(d) {
     if (d.error) {
       btn.disabled = false; btn.textContent = '✓ Marquer envoyé';
@@ -740,7 +714,7 @@ function sendDraft() {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({subject: subject, body: body, email_type: document.getElementById('draft-type').value}),
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
   .then(function(d) {
     if (btn) { btn.disabled = false; btn.textContent = 'Envoyer'; }
     if (d.error) {
@@ -750,6 +724,13 @@ function sendDraft() {
     var qel = document.getElementById('modal-quota-count');
     if (qel) qel.textContent = d.quota;
     if (btn) { btn.textContent = '✓ Envoyé !'; setTimeout(function(){ btn.textContent = 'Envoyer'; }, 2000); }
+    var cell = document.querySelector('td[data-field="date_premier_contact"][data-id="' + _draftContactId + '"]');
+    if (cell && cell.textContent.trim() === '—') {
+      var now = new Date();
+      var dd = String(now.getDate()).padStart(2, '0');
+      var mm = String(now.getMonth() + 1).padStart(2, '0');
+      cell.textContent = dd + '/' + mm + '/' + now.getFullYear();
+    }
     closeDraftModal();
   })
   .catch(function(e) {
