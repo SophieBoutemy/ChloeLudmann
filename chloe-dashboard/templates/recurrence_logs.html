@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}Logs cours récurrents — Mon Adjoint IA{% endblock %}
+
+{% block extra_head %}
+<style>
+.log-section {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  margin-bottom: 1.25rem;
+}
+
+.log-section-header {
+  padding: .85rem 1.25rem;
+  border-bottom: 1px solid #f0ece8;
+  font-size: .9375rem;
+  font-weight: 600;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.log-meta {
+  font-size: .75rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.log-pre {
+  margin: 0;
+  padding: .9rem 1.25rem;
+  font-size: .72rem;
+  line-height: 1.6;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  color: #3a3a3a;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #fafaf8;
+  border-radius: 0 0 8px 8px;
+}
+
+.log-empty {
+  padding: 1.5rem 1.25rem;
+  font-size: .85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .84rem;
+  color: var(--green);
+  text-decoration: none;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+.back-link:hover { text-decoration: underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Logs — Cours récurrents</h1>
+  </div>
+</div>
+
+<a href="{{ url_for('recurrence') }}" class="back-link">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+  Retour aux cours récurrents
+</a>
+
+{% for log in logs %}
+<div class="log-section">
+  <div class="log-section-header">
+    {{ log.title }}
+    <span class="log-meta">{{ log.lines|length }} ligne(s) — dernières {{ log.max_lines }}</span>
+  </div>
+  {% if log.lines %}
+  <pre class="log-pre" id="log-{{ loop.index }}">{{ log.lines | join('\n') }}</pre>
+  <script>
+    (function() {
+      var pre = document.getElementById('log-{{ loop.index }}');
+      pre.scrollTop = pre.scrollHeight;
+    })();
+  </script>
+  {% else %}
+  <div class="log-empty">Aucune entrée dans ce log.</div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

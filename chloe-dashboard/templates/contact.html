@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Contact — Mon Adjoint IA{% endblock %}
+{% block content %}
+<div class="pro-wrap">
+  <div class="page-header">
+    <div class="page-header-row"><h1>Contact</h1></div>
+  </div>
+  <div class="form-card" style="max-width:560px">
+    {% if sent %}
+    <div style="background:#f0f8f0;border:1px solid #b7d9b0;border-radius:8px;padding:1rem 1.2rem;color:#2a6b2a;margin-bottom:1.2rem">
+      Message envoyé avec succès. Sophie vous répondra dans les meilleurs délais.
+    </div>
+    {% else %}
+    {% if error %}
+    <div class="alert-error">{ error }</div>
+    {% endif %}
+    <form method="post" action="{ url_for('contact_page') }">
+      <div class="form-row">
+        <div class="field">
+          <label for="nom">Nom <span style="color:#e55">*</span></label>
+          <input type="text" id="nom" name="nom" required autocomplete="name">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="email">Email <span style="color:#e55">*</span></label>
+          <input type="email" id="email" name="email" required autocomplete="email">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="sujet">Sujet</label>
+          <input type="text" id="sujet" name="sujet">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="message">Message <span style="color:#e55">*</span></label>
+          <textarea id="message" name="message" rows="6" required></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="fa-btn fa-btn--filled">Envoyer</button>
+      </div>
+    </form>
+    <p style="margin-top:1.2rem;font-size:.875rem;color:var(--muted)">
+      Vous pouvez aussi écrire directement à
+      <a href="mailto:contact@sophieboutemy.fr">contact@sophieboutemy.fr</a>
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

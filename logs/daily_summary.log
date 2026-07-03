@@ -1,0 +1,594 @@
+2026-05-26 18:00:02,436 INFO Récupération des événements des dernières 24h...
+2026-05-26 18:00:04,750 INFO 62 événement(s) trouvé(s)
+2026-05-26 18:00:04,750 INFO Récupération des contrats en attente depuis +8j...
+2026-05-26 18:00:05,795 INFO 13 contrat(s) en retard
+2026-05-26 18:00:11,738 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-05-26 18:00:11,753 INFO Résumé généré
+2026-05-26 18:00:12,623 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+
+# Résumé des modifications Notion — 23-26 mai 2026
+
+## Nouvelles demandes / premiers contacts
+- **Étudiante en stage à Rennes** (1er-12 juin) : demande de cours de chant en fin de journée ou week-end 6-7 juin
+- **Sophie** : demande de prise de contact pour cours individuels, s'interroge sur la possibilité de suivre les cours malgré une voix peu développée
+
+## Confirmations d'inscription 2026-2027
+- **Emma** : continuation confirmée, jeudi impairs 15h-16h
+- **Élève mercredi** : continuation confirmée, créneau mercredi validé (refus du lundi, trop tôt)
+- **Maïlys et Quentin** : continuation confirmée avec modification — passage à 1 cours/semaine (1h) au lieu de 2, flexible semaines paires/impaires
+- **Fanny** : continuation confirmée, accepte le cours semi-collectif à 17h30, préfère garder deux cours le jeudi
+
+## Non-renouvellement
+- **Lud** : arrêt en 2026-2027 pour raisons financières, poursuite jusqu'en juillet 2026
+
+## Confirmations Calendly
+Plusieurs confirmations de sessions : 25 mai (16h30), 2 juin (14h30, 17h30), 3 juin (11h30, 13h00), 7 mai (18h00), 17-18 juin, 19 juin (15h30, 17h30), 23 juin (17h30), 4-7 juillet
+
+## Annulations Calendly
+Annulations programmées : 2 juin (14h30), 3 juin (11h30), et autres dates antérieures
+
+⚠️ Contrats en attente depuis plus de 8 jours
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+• (sans titre) (167j)
+2026-05-27 18:00:01,764 INFO Récupération des événements des dernières 24h...
+2026-05-27 18:00:04,703 INFO 13 événement(s) trouvé(s)
+2026-05-27 18:00:04,704 INFO Récupération des contrats en attente depuis +8j...
+2026-05-27 18:00:05,364 INFO 13 contrat(s) en retard
+2026-05-27 18:00:16,175 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-05-27 18:00:16,192 INFO Résumé généré
+2026-05-27 18:00:17,496 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-05-27 18:00:17,496 INFO HTML body length: 10626 chars
+2026-05-28 18:00:02,313 INFO Récupération des événements des dernières 24h...
+2026-05-28 18:00:04,117 INFO 17 événement(s) trouvé(s)
+2026-05-28 18:00:04,117 INFO Récupération des contrats en attente depuis +8j...
+2026-05-28 18:00:05,623 INFO 13 contrat(s) en retard
+2026-05-28 18:00:16,856 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-05-28 18:00:16,873 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 5b1f17b1804b1-49099fefec9sm2408545e9.0 - gsmtp')
+2026-05-29 18:00:01,989 INFO Récupération des événements des dernières 24h...
+2026-05-29 18:00:08,312 INFO 310 événement(s) trouvé(s)
+2026-05-29 18:00:08,312 INFO Récupération des contrats en attente depuis +8j...
+2026-05-29 18:00:08,848 INFO 11 contrat(s) en retard
+2026-05-29 18:00:25,755 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-05-29 18:00:25,791 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 5b1f17b1804b1-4909c0ec5f8sm27684735e9.3 - gsmtp')
+2026-05-30 18:00:02,260 INFO Récupération des événements des dernières 24h...
+2026-05-30 18:00:06,846 INFO 18 événement(s) trouvé(s)
+2026-05-30 18:00:06,847 INFO Récupération des contrats en attente depuis +8j...
+2026-05-30 18:00:07,630 INFO 11 contrat(s) en retard
+2026-05-30 18:00:18,699 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-05-30 18:00:18,718 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 5b1f17b1804b1-4909c0b896csm92410695e9.1 - gsmtp')
+2026-05-31 20:00:02,392 INFO Récupération des événements des dernières 24h...
+2026-05-31 20:00:05,105 INFO 14 événement(s) trouvé(s)
+2026-05-31 20:00:05,106 INFO Récupération des contrats en attente depuis +8j...
+2026-05-31 20:00:05,664 INFO 11 contrat(s) en retard
+2026-05-31 20:00:16,540 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-05-31 20:00:16,557 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials ffacd0b85a97d-45ef35874b7sm20442599f8f.35 - gsmtp')
+2026-06-01 20:00:02,319 INFO Récupération des événements des dernières 24h...
+2026-06-01 20:00:04,823 INFO 9 événement(s) trouvé(s)
+2026-06-01 20:00:04,824 INFO Récupération des contrats en attente depuis +8j...
+2026-06-01 20:00:06,945 INFO 11 contrat(s) en retard
+2026-06-01 20:00:19,662 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-01 20:00:19,678 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials ffacd0b85a97d-45ef34bd320sm26219326f8f.13 - gsmtp')
+2026-06-02 20:00:01,951 INFO Récupération des événements des dernières 24h...
+2026-06-02 20:00:03,013 INFO 9 événement(s) trouvé(s)
+2026-06-02 20:00:03,013 INFO Récupération des contrats en attente depuis +8j...
+2026-06-02 20:00:03,891 INFO 11 contrat(s) en retard
+2026-06-02 20:00:11,528 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-02 20:00:11,544 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 5b1f17b1804b1-490b6159978sm796195e9.34 - gsmtp')
+2026-06-03 20:00:02,432 INFO Récupération des événements des dernières 24h...
+2026-06-03 20:00:04,348 INFO 8 événement(s) trouvé(s)
+2026-06-03 20:00:04,349 INFO Récupération des contrats en attente depuis +8j...
+2026-06-03 20:00:05,688 INFO 11 contrat(s) en retard
+2026-06-03 20:00:12,725 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-03 20:00:12,740 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials ffacd0b85a97d-4601f2f5612sm9849184f8f.15 - gsmtp')
+2026-06-04 20:00:01,658 INFO Récupération des événements des dernières 24h...
+2026-06-04 20:00:06,186 INFO 9 événement(s) trouvé(s)
+2026-06-04 20:00:06,187 INFO Récupération des contrats en attente depuis +8j...
+2026-06-04 20:00:07,376 INFO 11 contrat(s) en retard
+2026-06-04 20:00:17,096 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-04 20:00:17,122 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 5b1f17b1804b1-490bda4fd52sm85256455e9.0 - gsmtp')
+2026-06-05 20:00:02,328 INFO Récupération des événements des dernières 24h...
+2026-06-05 20:00:04,334 INFO 5 événement(s) trouvé(s)
+2026-06-05 20:00:04,334 INFO Récupération des contrats en attente depuis +8j...
+2026-06-05 20:00:05,440 INFO 11 contrat(s) en retard
+2026-06-05 20:00:14,297 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-05 20:00:14,314 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials ffacd0b85a97d-4601f2dcde3sm30918446f8f.1 - gsmtp')
+2026-06-06 20:00:01,721 INFO Récupération des événements des dernières 24h...
+2026-06-06 20:00:03,380 INFO 0 événement(s) trouvé(s)
+2026-06-06 20:00:03,381 INFO Rien à signaler — mail non envoyé
+2026-06-07 20:00:02,337 INFO Récupération des événements des dernières 24h...
+2026-06-07 20:00:04,226 INFO 1 événement(s) trouvé(s)
+2026-06-07 20:00:04,227 INFO Récupération des contrats en attente depuis +8j...
+2026-06-07 20:00:05,476 INFO 11 contrat(s) en retard
+2026-06-07 20:00:09,859 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-07 20:00:09,878 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 5b1f17b1804b1-490c2d2d11asm264925545e9.1 - gsmtp')
+2026-06-08 20:00:02,395 INFO Récupération des événements des dernières 24h...
+2026-06-08 20:00:04,849 INFO 3 événement(s) trouvé(s)
+2026-06-08 20:00:04,850 INFO Récupération des contrats en attente depuis +8j...
+2026-06-08 20:00:06,055 INFO 11 contrat(s) en retard
+2026-06-08 20:00:12,756 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-08 20:00:12,770 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 5b1f17b1804b1-490bc3fd663sm484383335e9.10 - gsmtp')
+2026-06-09 20:00:01,680 INFO Récupération des événements des dernières 24h...
+2026-06-09 20:00:04,104 INFO 3 événement(s) trouvé(s)
+2026-06-09 20:00:04,105 INFO Récupération des contrats en attente depuis +8j...
+2026-06-09 20:00:04,998 INFO 11 contrat(s) en retard
+2026-06-09 20:00:10,936 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-09 20:00:10,953 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 5b1f17b1804b1-490bc413adbsm510772105e9.15 - gsmtp')
+2026-06-10 20:00:01,520 INFO Récupération des événements des dernières 24h...
+2026-06-10 20:00:08,270 INFO 7 événement(s) trouvé(s)
+2026-06-10 20:00:08,271 INFO Récupération des contrats en attente depuis +8j...
+2026-06-10 20:00:09,419 INFO 11 contrat(s) en retard
+2026-06-10 20:00:18,411 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-10 20:00:18,427 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials ffacd0b85a97d-4601f345209sm79855240f8f.17 - gsmtp')
+2026-06-11 20:00:01,870 INFO Récupération des événements des dernières 24h...
+2026-06-11 20:00:03,556 INFO 10 événement(s) trouvé(s)
+2026-06-11 20:00:03,556 INFO Récupération des contrats en attente depuis +8j...
+2026-06-11 20:00:04,351 INFO 11 contrat(s) en retard
+2026-06-11 20:00:15,122 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-11 20:00:15,139 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials ffacd0b85a97d-4606c074e9asm1376396f8f.0 - gsmtp')
+2026-06-12 20:00:01,884 INFO Récupération des événements des dernières 24h...
+2026-06-12 20:00:03,222 INFO 10 événement(s) trouvé(s)
+2026-06-12 20:00:03,222 INFO Récupération des contrats en attente depuis +8j...
+2026-06-12 20:00:05,275 INFO 11 contrat(s) en retard
+2026-06-12 20:00:13,402 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-12 20:00:13,425 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 5b1f17b1804b1-4922037ba81sm12246775e9.15 - gsmtp')
+2026-06-13 20:00:01,559 INFO Récupération des événements des dernières 24h...
+2026-06-13 20:00:02,528 INFO 5 événement(s) trouvé(s)
+2026-06-13 20:00:02,528 INFO Récupération des contrats en attente depuis +8j...
+2026-06-13 20:00:03,751 INFO 11 contrat(s) en retard
+2026-06-13 20:00:09,923 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-13 20:00:09,939 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials ffacd0b85a97d-4606f2b0d4fsm19160952f8f.24 - gsmtp')
+2026-06-14 20:00:01,626 INFO Récupération des événements des dernières 24h...
+2026-06-14 20:00:02,725 INFO 1 événement(s) trouvé(s)
+2026-06-14 20:00:02,725 INFO Récupération des contrats en attente depuis +8j...
+2026-06-14 20:00:03,862 INFO 11 contrat(s) en retard
+2026-06-14 20:00:07,234 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-14 20:00:07,249 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 5b1f17b1804b1-490ea9563b8sm176888985e9.2 - gsmtp')
+2026-06-15 20:00:01,604 INFO Récupération des événements des dernières 24h...
+2026-06-15 20:00:02,813 INFO 8 événement(s) trouvé(s)
+2026-06-15 20:00:02,813 INFO Récupération des contrats en attente depuis +8j...
+2026-06-15 20:00:03,739 INFO 11 contrat(s) en retard
+2026-06-15 20:00:11,717 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-15 20:00:11,733 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials ffacd0b85a97d-4606f2e592csm40234650f8f.36 - gsmtp')
+2026-06-16 20:00:01,822 INFO Récupération des événements des dernières 24h...
+2026-06-16 20:00:02,586 INFO 7 événement(s) trouvé(s)
+2026-06-16 20:00:02,586 INFO Récupération des contrats en attente depuis +8j...
+2026-06-16 20:00:03,086 INFO 11 contrat(s) en retard
+2026-06-16 20:00:10,897 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-16 20:00:10,914 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials ffacd0b85a97d-461abb44c3dsm6007728f8f.9 - gsmtp')
+2026-06-17 20:00:01,624 INFO Récupération des événements des dernières 24h...
+2026-06-17 20:00:02,693 INFO 5 événement(s) trouvé(s)
+2026-06-17 20:00:02,694 INFO Récupération des contrats en attente depuis +8j...
+2026-06-17 20:00:03,335 INFO 11 contrat(s) en retard
+2026-06-17 20:00:09,927 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-17 20:00:09,944 INFO Résumé généré
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/daily_summary.py", line 305, in <module>
+    main()
+  File "/home/ubuntu/automations/daily_summary.py", line 299, in main
+    send_mail(subject, summary)
+  File "/home/ubuntu/automations/daily_summary.py", line 270, in send_mail
+    smtp.login(SMTP_USER, SMTP_PASSWORD)
+  File "/usr/lib/python3.12/smtplib.py", line 750, in login
+    raise last_exception
+  File "/usr/lib/python3.12/smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ^^^^^^^^^^
+  File "/usr/lib/python3.12/smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials ffacd0b85a97d-4606f26f4f6sm60141241f8f.16 - gsmtp')
+2026-06-18 20:00:02,205 INFO Récupération des événements des dernières 24h...
+2026-06-18 20:00:03,653 INFO 1 événement(s) trouvé(s)
+2026-06-18 20:00:03,654 INFO Récupération des contrats en attente depuis +8j...
+2026-06-18 20:00:04,695 INFO 11 contrat(s) en retard
+2026-06-18 20:00:09,339 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-18 20:00:09,355 INFO Résumé généré
+2026-06-18 20:00:10,931 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-18 20:00:10,931 INFO HTML body length: 5026 chars
+2026-06-19 20:00:01,673 INFO Récupération des événements des dernières 24h...
+2026-06-19 20:00:03,226 INFO 2 événement(s) trouvé(s)
+2026-06-19 20:00:03,227 INFO Récupération des contrats en attente depuis +8j...
+2026-06-19 20:00:04,365 INFO 11 contrat(s) en retard
+2026-06-19 20:00:09,259 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-19 20:00:09,273 INFO Résumé généré
+2026-06-19 20:00:10,763 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-19 20:00:10,763 INFO HTML body length: 5279 chars
+2026-06-20 20:00:02,439 INFO Récupération des événements des dernières 24h...
+2026-06-20 20:00:03,279 INFO 2 événement(s) trouvé(s)
+2026-06-20 20:00:03,279 INFO Récupération des contrats en attente depuis +8j...
+2026-06-20 20:00:03,996 INFO 11 contrat(s) en retard
+2026-06-20 20:00:07,742 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-20 20:00:07,758 INFO Résumé généré
+2026-06-20 20:00:09,333 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-20 20:00:09,334 INFO HTML body length: 5369 chars
+2026-06-21 20:00:02,358 INFO Récupération des événements des dernières 24h...
+2026-06-21 20:00:03,711 INFO 1 événement(s) trouvé(s)
+2026-06-21 20:00:03,711 INFO Récupération des contrats en attente depuis +8j...
+2026-06-21 20:00:04,209 INFO 11 contrat(s) en retard
+2026-06-21 20:00:09,139 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-21 20:00:09,154 INFO Résumé généré
+2026-06-21 20:00:10,787 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-21 20:00:10,787 INFO HTML body length: 5866 chars
+2026-06-22 20:00:01,608 INFO Récupération des événements des dernières 24h...
+2026-06-22 20:00:03,085 INFO 6 événement(s) trouvé(s)
+2026-06-22 20:00:03,085 INFO Récupération des contrats en attente depuis +8j...
+2026-06-22 20:00:05,837 INFO 11 contrat(s) en retard
+2026-06-22 20:00:14,261 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-22 20:00:14,277 INFO Résumé généré
+2026-06-22 20:00:15,652 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-22 20:00:15,652 INFO HTML body length: 6380 chars
+2026-06-23 20:00:02,077 INFO Récupération des événements des dernières 24h...
+2026-06-23 20:00:03,559 INFO 8 événement(s) trouvé(s)
+2026-06-23 20:00:03,559 INFO Récupération des contrats en attente depuis +8j...
+2026-06-23 20:00:04,113 INFO 11 contrat(s) en retard
+2026-06-23 20:00:12,636 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-23 20:00:12,654 INFO Résumé généré
+2026-06-23 20:00:13,955 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-23 20:00:13,955 INFO HTML body length: 7485 chars
+2026-06-24 20:00:02,380 INFO Récupération des événements des dernières 24h...
+2026-06-24 20:00:03,766 INFO 5 événement(s) trouvé(s)
+2026-06-24 20:00:03,767 INFO Récupération des contrats en attente depuis +8j...
+2026-06-24 20:00:04,303 INFO 11 contrat(s) en retard
+2026-06-24 20:00:09,490 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-24 20:00:09,507 INFO Résumé généré
+2026-06-24 20:00:10,938 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-24 20:00:10,938 INFO HTML body length: 5879 chars
+2026-06-25 20:00:01,468 INFO Récupération des événements des dernières 24h...
+2026-06-25 20:00:02,917 INFO 3 événement(s) trouvé(s)
+2026-06-25 20:00:02,917 INFO Récupération des contrats en attente depuis +8j...
+2026-06-25 20:00:03,444 INFO 11 contrat(s) en retard
+2026-06-25 20:00:06,805 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-25 20:00:06,821 INFO Résumé généré
+2026-06-25 20:00:08,226 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-25 20:00:08,226 INFO HTML body length: 5031 chars
+2026-06-26 20:00:02,160 INFO Récupération des événements des dernières 24h...
+2026-06-26 20:00:02,686 INFO 4 événement(s) trouvé(s)
+2026-06-26 20:00:02,686 INFO Récupération des contrats en attente depuis +8j...
+2026-06-26 20:00:03,394 INFO 11 contrat(s) en retard
+2026-06-26 20:00:09,186 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-26 20:00:09,205 INFO Résumé généré
+2026-06-26 20:00:10,379 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-26 20:00:10,379 INFO HTML body length: 5950 chars
+2026-06-27 20:00:02,210 INFO Récupération des événements des dernières 24h...
+2026-06-27 20:00:04,023 INFO 3 événement(s) trouvé(s)
+2026-06-27 20:00:04,023 INFO Récupération des contrats en attente depuis +8j...
+2026-06-27 20:00:05,413 INFO 11 contrat(s) en retard
+2026-06-27 20:00:10,158 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-27 20:00:10,175 INFO Résumé généré
+2026-06-27 20:00:12,394 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-27 20:00:12,395 INFO HTML body length: 6173 chars
+2026-06-28 20:00:01,984 INFO Récupération des événements des dernières 24h...
+2026-06-28 20:00:03,897 INFO 2 événement(s) trouvé(s)
+2026-06-28 20:00:03,897 INFO Récupération des contrats en attente depuis +8j...
+2026-06-28 20:00:04,874 INFO 11 contrat(s) en retard
+2026-06-28 20:00:10,162 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-28 20:00:10,177 INFO Résumé généré
+2026-06-28 20:00:11,895 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-28 20:00:11,896 INFO HTML body length: 6280 chars
+2026-06-29 20:00:02,458 INFO Récupération des événements des dernières 24h...
+2026-06-29 20:00:03,491 INFO 2 événement(s) trouvé(s)
+2026-06-29 20:00:03,492 INFO Récupération des contrats en attente depuis +8j...
+2026-06-29 20:00:03,936 INFO 11 contrat(s) en retard
+2026-06-29 20:00:08,444 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-29 20:00:08,459 INFO Résumé généré
+2026-06-29 20:00:09,644 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-29 20:00:09,645 INFO HTML body length: 5138 chars
+2026-06-30 20:00:01,892 INFO Récupération des événements des dernières 24h...
+2026-06-30 20:00:02,754 INFO 2 événement(s) trouvé(s)
+2026-06-30 20:00:02,755 INFO Récupération des contrats en attente depuis +8j...
+2026-06-30 20:00:03,515 INFO 11 contrat(s) en retard
+2026-06-30 20:00:08,476 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-30 20:00:08,490 INFO Résumé généré
+2026-06-30 20:00:10,163 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-06-30 20:00:10,163 INFO HTML body length: 5169 chars
+2026-07-01 20:00:02,183 INFO Récupération des événements des dernières 24h...
+2026-07-01 20:00:03,099 INFO 3 événement(s) trouvé(s)
+2026-07-01 20:00:03,100 INFO Récupération des contrats en attente depuis +8j...
+2026-07-01 20:00:05,593 INFO 11 contrat(s) en retard
+2026-07-01 20:00:09,151 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-01 20:00:09,168 INFO Résumé généré
+2026-07-01 20:00:11,462 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-07-01 20:00:11,462 INFO HTML body length: 5325 chars
+2026-07-02 20:00:02,249 INFO Récupération des événements des dernières 24h...
+2026-07-02 20:00:02,974 INFO 4 événement(s) trouvé(s)
+2026-07-02 20:00:02,975 INFO Récupération des contrats en attente depuis +8j...
+2026-07-02 20:00:04,066 INFO 11 contrat(s) en retard
+2026-07-02 20:00:09,817 INFO HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-02 20:00:09,835 INFO Résumé généré
+2026-07-02 20:00:11,068 INFO Mail envoyé à : contact@chloeludmann.fr, bour.chloe0@gmail.com
+2026-07-02 20:00:11,068 INFO HTML body length: 6068 chars

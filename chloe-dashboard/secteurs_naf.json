@@ -1,0 +1,221 @@
+[
+  {
+    "categorie": "Artisanat & BTP",
+    "codes": [
+      {
+        "code": "43.22A",
+        "label": "Plomberie / installation eau et gaz"
+      },
+      {
+        "code": "43.21A",
+        "label": "Installation électrique"
+      },
+      {
+        "code": "43.34Z",
+        "label": "Travaux de peinture et vitrerie"
+      },
+      {
+        "code": "43.32A",
+        "label": "Menuiserie bois et PVC"
+      },
+      {
+        "code": "43.39Z",
+        "label": "Autres travaux de finition"
+      }
+    ]
+  },
+  {
+    "categorie": "Commerce & vente",
+    "codes": [
+      {
+        "code": "47.91A",
+        "label": "Vente à distance sur catalogue général"
+      },
+      {
+        "code": "47.91B",
+        "label": "Vente à distance sur catalogue spécialisé"
+      },
+      {
+        "code": "47.71Z",
+        "label": "Commerce de détail d'habillement"
+      },
+      {
+        "code": "47.19B",
+        "label": "Autres commerces de détail en magasin non spécialisé"
+      }
+    ]
+  },
+  {
+    "categorie": "Services aux entreprises",
+    "codes": [
+      {
+        "code": "70.22Z",
+        "label": "Conseil pour les affaires et autres conseils de gestion"
+      },
+      {
+        "code": "62.01Z",
+        "label": "Programmation informatique"
+      },
+      {
+        "code": "63.11Z",
+        "label": "Traitement de données, hébergement"
+      },
+      {
+        "code": "73.11Z",
+        "label": "Agences de publicité"
+      },
+      {
+        "code": "74.30Z",
+        "label": "Traduction et interprétation"
+      },
+      {
+        "code": "82.99Z",
+        "label": "Autres activités de soutien aux entreprises"
+      }
+    ]
+  },
+  {
+    "categorie": "Santé & bien-être",
+    "codes": [
+      {
+        "code": "86.90F",
+        "label": "Activités de santé humaine non classées (sophrologues, thérapeutes)"
+      },
+      {
+        "code": "96.04Z",
+        "label": "Entretien corporel"
+      },
+      {
+        "code": "85.51Z",
+        "label": "Enseignement de disciplines sportives et de loisirs (coachs)"
+      }
+    ]
+  },
+  {
+    "categorie": "Enseignement & formation",
+    "codes": [
+      {
+        "code": "85.59A",
+        "label": "Formation continue d'adultes"
+      },
+      {
+        "code": "85.52Z",
+        "label": "Enseignement culturel"
+      },
+      {
+        "code": "85.59B",
+        "label": "Autres enseignements"
+      }
+    ]
+  },
+  {
+    "categorie": "Culture, art & création",
+    "codes": [
+      {
+        "code": "74.20Z",
+        "label": "Activités photographiques"
+      },
+      {
+        "code": "90.03A",
+        "label": "Création artistique — arts plastiques"
+      },
+      {
+        "code": "90.03B",
+        "label": "Autre création artistique"
+      },
+      {
+        "code": "74.10Z",
+        "label": "Activités spécialisées de design"
+      }
+    ]
+  },
+  {
+    "categorie": "Hôtellerie, restauration & événementiel",
+    "codes": [
+      {
+        "code": "56.10C",
+        "label": "Restauration de type rapide"
+      },
+      {
+        "code": "56.21Z",
+        "label": "Services des traiteurs"
+      },
+      {
+        "code": "82.30Z",
+        "label": "Organisation de salons professionnels et congrès"
+      }
+    ]
+  },
+  {
+    "categorie": "Professions juridiques, comptables & financières",
+    "codes": [
+      {
+        "code": "69.10Z",
+        "label": "Activités juridiques"
+      },
+      {
+        "code": "69.20Z",
+        "label": "Activités comptables"
+      },
+      {
+        "code": "66.19B",
+        "label": "Autres activités auxiliaires de services financiers (courtiers)"
+      }
+    ]
+  },
+  {
+    "categorie": "Immobilier",
+    "codes": [
+      {
+        "code": "68.31Z",
+        "label": "Agences immobilières"
+      },
+      {
+        "code": "68.32A",
+        "label": "Administration d'immeubles"
+      }
+    ]
+  },
+  {
+    "categorie": "Transport & services à la personne",
+    "codes": [
+      {
+        "code": "49.32Z",
+        "label": "Transports de voyageurs par taxis / VTC"
+      },
+      {
+        "code": "49.42Z",
+        "label": "Services de déménagement"
+      },
+      {
+        "code": "88.10A",
+        "label": "Aide à domicile"
+      }
+    ]
+  },
+  {
+    "categorie": "Lieux culturels & événementiel",
+    "codes": [
+      {
+        "code": "90.04Z",
+        "label": "Gestion de salles de spectacles"
+      },
+      {
+        "code": "90.01Z",
+        "label": "Arts du spectacle vivant"
+      },
+      {
+        "code": "90.02Z",
+        "label": "Activités de soutien au spectacle vivant"
+      },
+      {
+        "code": "94.99Z",
+        "label": "Autres organisations fonctionnant par adhésion volontaire (associations)"
+      },
+      {
+        "code": "82.30Z",
+        "label": "Organisation de foires, salons professionnels et congrès"
+      }
+    ]
+  }
+]

@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+
+{% block title %}Effacement RGPD — Mon Adjoint IA{% endblock %}
+
+{% block extra_head %}
+<style>
+.rgpd-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  max-width: 560px;
+}
+
+.rgpd-card-header {
+  padding: .85rem 1.25rem;
+  border-bottom: 1px solid #f0ece8;
+  font-size: .9375rem;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.rgpd-card-body {
+  padding: 1.25rem;
+}
+
+.rgpd-notice {
+  font-size: .8175rem;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 1.25rem;
+  padding: .75rem 1rem;
+  background: #fafaf8;
+  border-left: 3px solid #e6e1dc;
+  border-radius: 0 6px 6px 0;
+}
+
+.field {
+  margin-bottom: 1rem;
+}
+
+.field label {
+  display: block;
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: .4rem;
+}
+
+.field input[type="email"],
+.field input[type="text"] {
+  width: 100%;
+  padding: .45rem .75rem;
+  border: 1.5px solid #e6e1dc;
+  border-radius: 6px;
+  font-size: .875rem;
+  font-family: inherit;
+  color: var(--text);
+  background: #fafaf8;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color .15s;
+}
+.field input:focus { border-color: var(--green); background: #fff; }
+
+.field-hint {
+  font-size: .75rem;
+  color: var(--muted);
+  margin-top: .3rem;
+}
+
+.btn-danger {
+  padding: .5rem 1.2rem;
+  background: #cc3333;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: .8375rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-danger:hover { background: #b52a2a; }
+
+.alert-error {
+  padding: .65rem 1rem;
+  background: #fff0f0;
+  border: 1px solid #f5b0b0;
+  border-radius: 6px;
+  font-size: .8175rem;
+  color: #b52a2a;
+  margin-bottom: 1rem;
+}
+
+.result-ok {
+  padding: 1rem 1.25rem;
+}
+
+.result-title {
+  font-weight: 600;
+  color: #2a7a2a;
+  margin-bottom: .75rem;
+  font-size: .9375rem;
+}
+
+.result-email {
+  font-family: monospace;
+  font-size: .875rem;
+  background: #f0f7f1;
+  border: 1px solid #b0d9b8;
+  border-radius: 5px;
+  padding: .3rem .65rem;
+  display: inline-block;
+  margin-bottom: .9rem;
+}
+
+.result-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: .8175rem;
+}
+
+.result-table td {
+  padding: .35rem .75rem;
+  border-bottom: 1px solid #f0ece8;
+  color: var(--text);
+}
+
+.result-table td:first-child {
+  color: var(--muted);
+  font-family: monospace;
+  font-size: .79rem;
+  width: 55%;
+}
+
+.result-log-notice {
+  margin-top: .85rem;
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  margin-top: 1rem;
+  font-size: .84rem;
+  color: var(--green);
+  text-decoration: none;
+  font-weight: 500;
+}
+.btn-back:hover { text-decoration: underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Effacement RGPD</h1>
+  </div>
+</div>
+
+<div class="rgpd-card">
+  <div class="rgpd-card-header">Droit à l'effacement — Article 17 RGPD</div>
+
+  {% if done %}
+  <div class="result-ok">
+    <div class="result-title">Effacement effectué</div>
+    <div class="result-email">{{ email }}</div>
+    <table class="result-table">
+      <tr>
+        <td>pending.db (créneaux en attente)</td>
+        <td>{{ results.db_deleted }} entrée(s) supprimée(s)</td>
+      </tr>
+      {% for fname, n in results.log_lines.items() %}
+      <tr>
+        <td>{{ fname }}</td>
+        <td>{{ n }} ligne(s) supprimée(s)</td>
+      </tr>
+      {% endfor %}
+      {% if results.errors %}
+      {% for err in results.errors %}
+      <tr>
+        <td colspan="2" style="color:#b52a2a">Erreur : {{ err }}</td>
+      </tr>
+      {% endfor %}
+      {% endif %}
+    </table>
+    <p class="result-log-notice">
+      Cette opération a été journalisée dans <code>logs/purge_rgpd.log</code>.
+    </p>
+    <a href="{{ url_for('rgpd') }}" class="btn-back">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      Nouvel effacement
+    </a>
+  </div>
+
+  {% else %}
+  <div class="rgpd-card-body">
+    <p class="rgpd-notice">
+      Supprime toutes les données liées à l'adresse email indiquée :
+      créneaux en attente dans <code>pending.db</code> et lignes de logs
+      mentionnant cet email. L'opération est irréversible et journalisée.
+    </p>
+
+    {% if error %}
+    <div class="alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post">
+      <div class="field">
+        <label for="email">Adresse email à effacer</label>
+        <input type="email" id="email" name="email" required
+               placeholder="eleve@exemple.fr" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="confirm">Confirmation</label>
+        <input type="text" id="confirm" name="confirm" required
+               placeholder="Tapez EFFACER pour confirmer" autocomplete="off">
+        <p class="field-hint">Tapez exactement <strong>EFFACER</strong> pour valider.</p>
+      </div>
+      <button type="submit" class="btn-danger">Effacer les données</button>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

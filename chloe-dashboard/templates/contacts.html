@@ -1,0 +1,742 @@
+{% extends 'base.html' %}
+{% block title %}Contacts — Mon Espace Pro{% endblock %}
+
+{% block extra_head %}
+<style>
+.contacts-toolbar {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem 1.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: center;
+}
+.filter-input, .filter-select {
+  padding: .4rem .7rem;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: .8125rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
+  background: #fafaf9;
+  outline: none;
+  transition: border-color .15s;
+  min-width: 0;
+}
+.filter-input { width: 200px; }
+.filter-select { width: 160px; }
+.filter-input:focus, .filter-select:focus { border-color: var(--green); background: #fff; }
+.filter-spacer { flex: 1; }
+.btn-export {
+  padding: .4rem 1rem;
+  background: var(--orange);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: .8125rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.btn-export:hover { background: #EF8F20; }
+.btn-export--xlsx { background: var(--green); }
+.btn-export--xlsx:hover { background: #2a3b1e; }
+.contacts-meta { font-size: .8rem; color: var(--muted); font-family: 'Karla', sans-serif; white-space: nowrap; }
+.table-wrap { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+thead th {
+  padding: .75rem 1rem;
+  text-align: left;
+  font-size: .72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  border-bottom: 1.5px solid var(--border);
+  white-space: nowrap;
+  font-family: 'Karla', sans-serif;
+}
+tbody td { padding: .6rem 1rem; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: #faf9f7; }
+.td-name { font-weight: 500; max-width: 200px; }
+.td-name small { display: block; color: var(--muted); font-weight: 400; font-size: .75rem; margin-top: .1rem; }
+.td-act  { color: var(--muted); max-width: 140px; }
+.td-link a { color: var(--green); text-decoration: none; font-size: .78rem; }
+.td-link a:hover { text-decoration: underline; }
+.td-link .no-val { color: #c4bfb9; font-style: italic; font-size: .78rem; }
+.td-date { color: var(--muted); white-space: nowrap; font-size: .75rem; }
+.site-wrap  { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.email-wrap { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.site-badge {
+  display: inline-block;
+  font-size: .68rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  padding: .1rem .45rem;
+  border-radius: 10px;
+  white-space: nowrap;
+  background: #fef9c3;
+  color: #854d0e;
+}
+.site-badge--ok { background: #dcfce7; color: #166534; }
+.email-badge {
+  display: inline-block;
+  font-size: .68rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  padding: .1rem .45rem;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.email-badge--ok      { background: #dcfce7; color: #166534; }
+.email-badge--risk    { background: #fff7ed; color: #9a3412; }
+.email-badge--invalid { background: #fee2e2; color: #991b1b; }
+.btn-verify-site {
+  display: inline-flex;
+  align-items: center;
+  padding: .1rem .35rem;
+  background: transparent;
+  border: 1px solid #86c98c;
+  border-radius: 4px;
+  font-size: .68rem;
+  color: #166534;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s;
+  line-height: 1;
+}
+.btn-verify-site:hover { background: #dcfce7; }
+.btn-desinscrit {
+  display: inline-flex;
+  align-items: center;
+  padding: .1rem .35rem;
+  background: transparent;
+  border: 1px solid #dc2626;
+  border-radius: 4px;
+  font-size: .66rem;
+  color: #dc2626;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s;
+  line-height: 1;
+  font-family: 'Karla', sans-serif;
+  font-weight: 600;
+}
+.btn-desinscrit:hover { background: #fee2e2; }
+.statut-select {
+  padding: .25rem .5rem;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  font-size: .75rem;
+  font-family: 'Karla', sans-serif;
+  color: var(--text);
+  background: #fafaf9;
+  cursor: pointer;
+  outline: none;
+  transition: border-color .15s, background .15s;
+  max-width: 145px;
+}
+.statut-select:focus { border-color: var(--green); }
+.statut-select.saving { opacity: .6; }
+.statut-select.saved  { border-color: #4ade80; background: #f0fdf4; }
+.td-check { width: 2rem; padding-left: .9rem !important; }
+.th-check { width: 2rem; padding-left: .9rem !important; }
+.row-check, #check-all { width: 15px; height: 15px; accent-color: var(--green); cursor: pointer; vertical-align: middle; }
+.btn-draft {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .2rem .55rem;
+  background: transparent;
+  border: 1.5px solid var(--green);
+  border-radius: 6px;
+  font-size: .72rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  color: var(--green);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s, color .12s;
+  line-height: 1;
+}
+.btn-draft:hover { background: var(--green); color: #fff; }
+.actions-bar {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  padding: .6rem 1.4rem;
+  background: #f5f3f0;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+}
+.sel-label { font-size: .8125rem; color: var(--muted); font-family: 'Karla', sans-serif; }
+.btn-danger {
+  padding: .38rem 1rem;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: .8125rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.btn-danger:disabled { background: #fca5a5; cursor: default; }
+.pagination { display: flex; align-items: center; gap: .5rem; justify-content: center; padding-top: .5rem; }
+.page-link { padding: .3rem .75rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: .8125rem; color: var(--text); text-decoration: none; transition: background .12s; }
+.page-link:hover { background: #f0f2ee; }
+.page-link.active { background: var(--green); color: #fff; border-color: var(--green); }
+.page-info { font-size: .8rem; color: var(--muted); }
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(0,0,0,.45);
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.75rem;
+  max-width: 620px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
+}
+.modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.1rem; gap: 1rem; }
+.modal-title { font-family: 'Fraunces', Georgia, serif; font-size: 1.15rem; font-weight: 600; color: var(--text); line-height: 1.25; }
+.modal-subtitle { font-size: .8rem; color: var(--muted); font-family: 'Karla', sans-serif; margin-top: .2rem; }
+.modal-close { background: none; border: none; font-size: 1.3rem; color: var(--muted); cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
+.modal-close:hover { color: var(--text); }
+.modal-field { margin-bottom: 1rem; }
+.modal-field label { display: block; font-size: .78rem; font-weight: 600; color: var(--text); font-family: 'Karla', sans-serif; margin-bottom: .35rem; }
+.modal-select, .modal-input, .modal-textarea {
+  width: 100%;
+  padding: .5rem .75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: .875rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
+  background: #fafaf9;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color .15s;
+}
+.modal-select:focus, .modal-input:focus, .modal-textarea:focus { border-color: var(--green); background: #fff; }
+.modal-textarea { resize: vertical; min-height: 160px; line-height: 1.5; }
+.modal-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1.2rem; }
+.modal-btn {
+  padding: .5rem 1.1rem;
+  border-radius: 7px;
+  font-size: .875rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  cursor: pointer;
+  border: none;
+  transition: background .15s;
+}
+.modal-btn--primary { background: var(--green); color: #fff; }
+.modal-btn--primary:hover { background: #2a3b1e; }
+.modal-btn--primary:disabled { background: #9caa91; cursor: default; }
+.modal-btn--secondary { background: #f0f2ee; color: var(--text); border: 1.5px solid var(--border); }
+.modal-btn--secondary:hover { background: #e5e8e2; }
+.modal-btn--copy { background: var(--orange); color: #fff; }
+.modal-btn--copy:hover { background: #EF8F20; }
+.modal-btn--send { background: #2563eb; color: #fff; }
+.modal-btn--send:hover:not(:disabled) { background: #1d4ed8; }
+.modal-btn--send:disabled { background: #93c5fd; cursor: default; }
+.modal-error { font-size: .8rem; color: #dc2626; font-family: 'Karla', sans-serif; margin-top: .5rem; }
+.modal-quota { font-size: .78rem; color: var(--muted); font-family: 'Karla', sans-serif; margin-top: .6rem; }
+.modal-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: .4rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Contacts <span style="font-size:1rem;font-weight:400;color:var(--muted)">({{ total }})</span></h1>
+    <div class="sub-nav">
+      <a href="{{ url_for('prospection_contacts') }}" class="sub-nav-contacts">Contacts</a>
+      <div class="sub-nav-right">
+        <a href="{{ url_for('prospection_profile') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_profile' %} active{% endif %}">Profil expéditeur</a>
+        <a href="{{ url_for('prospection_today') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_today' %} active{% endif %}">À traiter</a>
+        <a href="{{ url_for('prospection_funnel') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_funnel' %} active{% endif %}">Entonnoir</a>
+      </div>
+    </div>
+  </div>
+  <div class="page-back"><a href="{{ url_for('prospection') }}">← Tableau de bord Adjoint Prospection</a></div>
+</div>
+
+<form method="get" action="{{ url_for('prospection_contacts') }}" id="filter-form">
+<div class="contacts-toolbar">
+  <input type="text" name="search" class="filter-input"
+         placeholder="Rechercher…" value="{{ filters.search }}"
+         oninput="debounceSubmit()">
+  <select name="statut" class="filter-select" onchange="this.form.submit()">
+    <option value="">Tous les statuts</option>
+    {% for val, label in statut_options %}
+    <option value="{{ val }}" {% if filters.statut == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select name="naf" class="filter-select" onchange="this.form.submit()">
+    <option value="">Tous les secteurs</option>
+    {% for n in naf_list %}
+    <option value="{{ n.naf }}" {% if filters.naf == n.naf %}selected{% endif %}>{{ n.activite }}</option>
+    {% endfor %}
+  </select>
+  {% if tranche_list %}
+  <select name="tranche" class="filter-select" onchange="this.form.submit()">
+    <option value="">Toutes tailles</option>
+    {% for code in tranche_list %}
+    <option value="{{ code }}" {% if filters.tranche == code %}selected{% endif %}>
+      {{ tranche_labels.get(code, code) }}
+    </option>
+    {% endfor %}
+  </select>
+  {% endif %}
+  <div class="filter-spacer"></div>
+  <span class="contacts-meta">{{ total }} contact{{ 's' if total != 1 }}</span>
+  <a href="{{ url_for('prospection_export', statut=filters.statut, naf=filters.naf, tranche=filters.tranche, search=filters.search) }}"
+     class="btn-export">CSV</a>
+  <a href="{{ url_for('prospection_export_xlsx', statut=filters.statut, naf=filters.naf, tranche=filters.tranche, search=filters.search) }}"
+     class="btn-export btn-export--xlsx">Excel</a>
+</div>
+</form>
+
+<div class="actions-bar" style="margin-top:.75rem">
+  <span class="sel-label"><span id="sel-count">0</span> sélectionné(s)</span>
+  <button type="button" class="btn-danger" id="btn-delete-sel" disabled onclick="deleteSelection()">
+    Supprimer la sélection
+  </button>
+  <div style="flex:1"></div>
+  <form method="post" action="{{ url_for('prospection_contacts_delete_empty') }}" style="margin:0">
+    <input type="hidden" name="next" value="{{ request.url }}">
+    <button type="submit" class="btn-danger"
+            onclick="return confirm('Supprimer tous les contacts sans email ni site web ? Cette action est irréversible.')">
+      Supprimer sans email ni site
+    </button>
+  </form>
+</div>
+
+<div class="table-wrap" style="margin-top:.75rem">
+  {% if contacts %}
+  <table>
+    <thead>
+      <tr>
+        <th class="th-check"><input type="checkbox" id="check-all" title="Tout sélectionner"></th>
+        <th>Entreprise / Dirigeant</th>
+        <th>Secteur</th>
+        <th>Localisation</th>
+        <th>Email</th>
+        <th>Site web</th>
+        <th>1er contact</th>
+        <th>Relance</th>
+        <th>Statut</th>
+        <th>Collecté</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in contacts %}
+      <tr>
+        <td class="td-check"><input type="checkbox" class="row-check" value="{{ c.id }}"></td>
+        <td class="td-name">
+          {{ c.nom_entreprise }}
+          {% if c.nom_dirigeant %}<small>{{ c.nom_dirigeant }}</small>{% endif %}
+        </td>
+        <td class="td-act">{{ c.activite }}</td>
+        <td style="white-space:nowrap;font-size:.78rem">
+          {{ c.ville }}{% if c.departement %} ({{ c.departement }}){% endif %}
+        </td>
+        <td class="td-link">
+          {% if c.email %}
+          <div class="email-wrap">
+            <a href="mailto:{{ c.email }}">{{ c.email }}</a>
+            {% if c.email_statut == 'vérifié' %}
+            <span class="email-badge email-badge--ok">✓ vérifié</span>
+            {% elif c.email_statut == 'à risque' %}
+            <span class="email-badge email-badge--risk">⚠ à risque</span>
+            {% elif c.email_statut == 'invalide' %}
+            <span class="email-badge email-badge--invalid">✗ invalide</span>
+            {% endif %}
+          </div>
+          {% else %}
+          <span class="no-val">—</span>
+          {% endif %}
+          <div style="margin-top:.3rem">
+            <button class="btn-draft"
+                    onclick="openDraftModal({{ c.id }}, '{{ c.nom_entreprise | replace("'", "\\'") }}', '{{ c.email | replace("'", "\\'") }}', '{{ c.nom_dirigeant | replace("'", "\\'") }}')">
+              ✏ Rédiger
+            </button>
+          </div>
+        </td>
+        <td class="td-link">
+          {% if c.site_web %}
+          <div class="site-wrap">
+            <a href="{{ c.site_web }}" target="_blank" rel="noopener">{{ c.site_web | replace('https://', '') | replace('http://', '') | truncate(32) }}</a>
+            {% if c.site_web_statut == 'vérifié' %}
+            <span class="site-badge site-badge--ok">✓ vérifié</span>
+            {% elif c.site_web_statut == 'à vérifier' %}
+            <span class="site-badge" id="site-badge-{{ c.id }}">? à vérifier</span>
+            <button class="btn-verify-site" onclick="verifySite({{ c.id }}, this)" title="Marquer comme vérifié">✓</button>
+            {% endif %}
+          </div>
+          {% else %}
+          <span class="no-val">—</span>
+          {% endif %}
+        </td>
+        <td class="td-date" data-field="date_premier_contact" data-id="{{ c.id }}">{{ c.date_premier_contact or '—' }}</td>
+        <td class="td-date">{{ c.date_relance or '—' }}</td>
+        <td>
+          <select class="statut-select" data-id="{{ c.id }}" onchange="updateStatut(this)">
+            <option value="">—</option>
+            {% for val, label in statut_options %}
+            <option value="{{ val }}" {% if c.statut == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          {% if c.statut != 'désinscrit' %}
+          <form method="post" action="{{ url_for('prospection_desinscrit', contact_id=c.id) }}"
+                style="display:inline;margin-top:.25rem">
+            <input type="hidden" name="next" value="{{ request.url }}">
+            <button type="submit" class="btn-desinscrit"
+                    onclick="return confirm('Désinscrire ce contact ? Action irréversible.')">
+              🚫 Désinscrire
+            </button>
+          </form>
+          {% endif %}
+        </td>
+        <td class="td-date">{{ c.date_collecte[:10] if c.date_collecte else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:3rem;text-align:center;color:var(--muted);font-family:'Karla',sans-serif">
+    {% if filters.search or filters.statut or filters.naf or filters.tranche %}
+    Aucun résultat pour ces filtres.
+    <a href="{{ url_for('prospection_contacts') }}" style="color:var(--green)">Réinitialiser</a>
+    {% else %}
+    Aucun contact encore. <a href="{{ url_for('prospection') }}" style="color:var(--green)">Lancer une recherche →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if pages > 1 %}
+<div class="pagination" style="margin-top:1rem">
+  {% if page > 1 %}
+  <a href="?{{ request.query_string.decode() | replace('page=' ~ page, 'page=' ~ (page-1)) }}" class="page-link">←</a>
+  {% endif %}
+  {% for p in range(1, pages + 1) %}
+    {% if p == page %}
+    <span class="page-link active">{{ p }}</span>
+    {% elif p == 1 or p == pages or (p >= page - 2 and p <= page + 2) %}
+    <a href="?{{ request.query_string.decode() | replace('page=' ~ page, 'page=' ~ p) if 'page=' in request.query_string.decode() else request.query_string.decode() ~ '&page=' ~ p }}" class="page-link">{{ p }}</a>
+    {% elif p == page - 3 or p == page + 3 %}
+    <span class="page-info">…</span>
+    {% endif %}
+  {% endfor %}
+  {% if page < pages %}
+  <a href="?{{ request.query_string.decode() | replace('page=' ~ page, 'page=' ~ (page+1)) if 'page=' in request.query_string.decode() else request.query_string.decode() ~ '&page=' ~ (page+1) }}" class="page-link">→</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Draft Modal -->
+<div class="modal-overlay" id="draft-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="draft-modal-title">Rédiger un email</div>
+        <div class="modal-subtitle" id="draft-modal-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeDraftModal()" title="Fermer">✕</button>
+    </div>
+
+    <div class="modal-field">
+      <label for="draft-type">Type d'email</label>
+      <select class="modal-select" id="draft-type">
+        {% for key, label in email_types.items() %}
+        <option value="{{ key }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="modal-actions" style="margin-top:.5rem;margin-bottom:1.2rem">
+      <button class="modal-btn modal-btn--primary" id="draft-gen-btn" onclick="generateDraft()">
+        Générer avec l'IA
+      </button>
+    </div>
+
+    <div id="draft-result" style="display:none">
+      <div class="modal-field">
+        <label for="draft-subject">Objet</label>
+        <input class="modal-input" id="draft-subject" type="text">
+      </div>
+      <div class="modal-field">
+        <label for="draft-body">Corps de l'email</label>
+        <textarea class="modal-textarea" id="draft-body" rows="10"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn--copy" onclick="copyDraft()">Copier</button>
+        <button class="modal-btn" id="draft-mark-btn" onclick="markSent()" style="background:#f0fdf4;color:#166534;border:1.5px solid #86efac;font-family:'Karla',sans-serif">✓ Marquer envoyé</button>
+        <button class="modal-btn modal-btn--primary" id="draft-regen-btn" onclick="generateDraft()">Régénérer</button>
+        {% if smtp_configured %}
+        <button class="modal-btn modal-btn--send" id="draft-send-btn" onclick="sendDraft()">Envoyer</button>
+        {% else %}
+        <a href="{{ url_for('prospection_profile') }}" class="modal-btn modal-btn--secondary" style="text-decoration:none">⚙ Configurer SMTP</a>
+        {% endif %}
+        <button class="modal-btn modal-btn--secondary" onclick="closeDraftModal()">Fermer</button>
+      </div>
+      <div class="modal-quota">
+        Envois aujourd'hui : <span id="modal-quota-count">{{ quota }}</span> / {{ daily_limit }}
+      </div>
+    </div>
+
+    <div id="draft-error" class="modal-error" style="display:none"></div>
+    <div id="draft-result-hidden" style="display:none">
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn--secondary" onclick="closeDraftModal()">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var _selCount = document.getElementById('sel-count');
+var _btnDel   = document.getElementById('btn-delete-sel');
+var _checkAll = document.getElementById('check-all');
+
+function _updateSel() {
+  var n = document.querySelectorAll('.row-check:checked').length;
+  _selCount.textContent = n;
+  _btnDel.disabled = n === 0;
+  var total = document.querySelectorAll('.row-check').length;
+  _checkAll.indeterminate = n > 0 && n < total;
+  _checkAll.checked = total > 0 && n === total;
+}
+_checkAll.addEventListener('change', function() {
+  document.querySelectorAll('.row-check').forEach(function(cb) { cb.checked = _checkAll.checked; });
+  _updateSel();
+});
+document.querySelectorAll('.row-check').forEach(function(cb) { cb.addEventListener('change', _updateSel); });
+
+function deleteSelection() {
+  var ids = Array.from(document.querySelectorAll('.row-check:checked')).map(function(cb) { return cb.value; });
+  if (!ids.length) return;
+  if (!confirm('Supprimer ' + ids.length + ' contact(s) ? Cette action est irréversible.')) return;
+  var form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '{{ url_for("prospection_contacts_delete") }}';
+  ids.forEach(function(id) {
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'ids'; inp.value = id;
+    form.appendChild(inp);
+  });
+  var next = document.createElement('input');
+  next.type = 'hidden'; next.name = 'next'; next.value = window.location.href;
+  form.appendChild(next);
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function updateStatut(sel) {
+  sel.classList.add('saving');
+  fetch('/prospection/contacts/' + sel.dataset.id, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({statut: sel.value}),
+  })
+  .then(function(r){ if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
+  .then(function(){
+    sel.classList.remove('saving');
+    sel.classList.add('saved');
+    setTimeout(function(){ sel.classList.remove('saved'); }, 1200);
+  })
+  .catch(function(){ sel.classList.remove('saving'); });
+}
+
+
+function verifySite(id, btn) {
+  fetch('/prospection/contacts/' + id, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({site_web_statut: 'vérifié'}),
+  })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
+  .then(function() {
+    var badge = document.getElementById('site-badge-' + id);
+    if (badge) { badge.textContent = '✓ vérifié'; badge.className = 'site-badge site-badge--ok'; }
+    btn.remove();
+  });
+}
+
+var _debounce;
+function debounceSubmit() {
+  clearTimeout(_debounce);
+  _debounce = setTimeout(function(){ document.getElementById('filter-form').submit(); }, 500);
+}
+
+var _draftContactId = null;
+
+function openDraftModal(id, name, email, dirigeant) {
+  _draftContactId = id;
+  document.getElementById('draft-modal-title').textContent = name;
+  var sub = email || '';
+  if (dirigeant && sub) sub = dirigeant + ' — ' + sub;
+  else if (dirigeant) sub = dirigeant;
+  document.getElementById('draft-modal-sub').textContent = sub;
+  document.getElementById('draft-result').style.display = 'none';
+  document.getElementById('draft-error').style.display = 'none';
+  document.getElementById('draft-result-hidden').style.display = 'none';
+  document.getElementById('draft-modal').classList.add('open');
+}
+
+function closeDraftModal() {
+  document.getElementById('draft-modal').classList.remove('open');
+}
+
+document.getElementById('draft-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDraftModal();
+});
+
+function generateDraft() {
+  if (!_draftContactId) return;
+  var btn = document.getElementById('draft-gen-btn');
+  var btn2 = document.getElementById('draft-regen-btn');
+  var errEl = document.getElementById('draft-error');
+  errEl.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="modal-spinner"></span>Génération…'; }
+  if (btn2) { btn2.disabled = true; }
+  fetch('/prospection/contacts/' + _draftContactId + '/draft', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email_type: document.getElementById('draft-type').value}),
+  })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
+  .then(function(d) {
+    if (btn) { btn.disabled = false; btn.textContent = "Générer avec l'IA"; }
+    if (btn2) { btn2.disabled = false; }
+    if (d.error) {
+      errEl.textContent = 'Erreur : ' + d.error;
+      errEl.style.display = '';
+      document.getElementById('draft-result-hidden').style.display = '';
+      return;
+    }
+    document.getElementById('draft-subject').value = d.subject || '';
+    document.getElementById('draft-body').value = d.body || '';
+    document.getElementById('draft-result').style.display = '';
+  })
+  .catch(function(e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Générer avec l'IA"; }
+    if (btn2) { btn2.disabled = false; }
+    errEl.textContent = 'Erreur réseau : ' + e.message;
+    errEl.style.display = '';
+    document.getElementById('draft-result-hidden').style.display = '';
+  });
+}
+
+function copyDraft() {
+  var subject = document.getElementById('draft-subject').value;
+  var body = document.getElementById('draft-body').value;
+  var text = 'Objet : ' + subject + '\n\n' + body;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      var btn = event.target;
+      var orig = btn.textContent;
+      btn.textContent = 'Copié !';
+      setTimeout(function() { btn.textContent = orig; }, 1500);
+    });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  }
+}
+
+function markSent() {
+  if (!_draftContactId) return;
+  if (!confirm('Marquer cet email comme envoyé ? Le statut du contact sera mis à jour.')) return;
+  var emailType = document.getElementById('draft-type').value;
+  var btn = document.getElementById('draft-mark-btn');
+  var errEl = document.getElementById('draft-error');
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  fetch('/prospection/contacts/' + _draftContactId + '/mark-sent', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email_type: emailType}),
+  })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
+  .then(function(d) {
+    if (d.error) {
+      btn.disabled = false; btn.textContent = '✓ Marquer envoyé';
+      errEl.textContent = 'Erreur : ' + d.error; errEl.style.display = ''; return;
+    }
+    btn.textContent = '✓ Envoi enregistré !';
+    setTimeout(function() { closeDraftModal(); }, 700);
+  })
+  .catch(function(e) {
+    btn.disabled = false; btn.textContent = '✓ Marquer envoyé';
+    errEl.textContent = 'Erreur réseau : ' + e.message; errEl.style.display = '';
+  });
+}
+
+function sendDraft() {
+  if (!_draftContactId) return;
+  var subject = document.getElementById('draft-subject').value.trim();
+  var body    = document.getElementById('draft-body').value.trim();
+  if (!subject || !body) { alert("Générez d'abord un brouillon."); return; }
+  var name = document.getElementById('draft-modal-title').textContent;
+  if (!confirm('Envoyer cet email à ' + name + ' ?')) return;
+  var btn   = document.getElementById('draft-send-btn');
+  var errEl = document.getElementById('draft-error');
+  errEl.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Envoi…'; }
+
+  fetch('/prospection/contacts/' + _draftContactId + '/send', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({subject: subject, body: body, email_type: document.getElementById('draft-type').value}),
+  })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
+  .then(function(d) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Envoyer'; }
+    if (d.error) {
+      errEl.textContent = 'Erreur : ' + d.error; errEl.style.display = '';
+      return;
+    }
+    var qel = document.getElementById('modal-quota-count');
+    if (qel) qel.textContent = d.quota;
+    if (btn) { btn.textContent = '✓ Envoyé !'; setTimeout(function(){ btn.textContent = 'Envoyer'; }, 2000); }
+    var cell = document.querySelector('td[data-field="date_premier_contact"][data-id="' + _draftContactId + '"]');
+    if (cell && cell.textContent.trim() === '—') {
+      var now = new Date();
+      var dd = String(now.getDate()).padStart(2, '0');
+      var mm = String(now.getMonth() + 1).padStart(2, '0');
+      cell.textContent = dd + '/' + mm + '/' + now.getFullYear();
+    }
+    closeDraftModal();
+  })
+  .catch(function(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Envoyer'; }
+    errEl.textContent = 'Erreur réseau : ' + e.message; errEl.style.display = '';
+  });
+}
+</script>
+{% endblock %}

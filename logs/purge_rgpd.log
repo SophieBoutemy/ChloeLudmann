@@ -1,0 +1,12 @@
+/home/ubuntu/automations/recurrence_calendly/purge_rgpd.py:102: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  cutoff = datetime.utcnow() - timedelta(days=RETENTION_DAYS)
+2026-07-01 03:00:02,031 INFO === Purge RGPD mensuelle — seuil : 2025-07-06 (rétention 12 mois) ===
+2026-07-01 03:00:02,031 INFO === Purge RGPD mensuelle — seuil : 2025-07-06 (rétention 12 mois) ===
+2026-07-01 03:00:02,032 INFO pending.db : 0 entrée(s) supprimée(s)
+2026-07-01 03:00:02,032 INFO pending.db : 0 entrée(s) supprimée(s)
+2026-07-01 03:00:02,053 INFO recurrence_calendly.log : 0 ligne(s) supprimée(s)
+2026-07-01 03:00:02,053 INFO recurrence_calendly.log : 0 ligne(s) supprimée(s)
+2026-07-01 03:00:02,053 INFO recurrence_retry.log : 0 ligne(s) supprimée(s)
+2026-07-01 03:00:02,053 INFO recurrence_retry.log : 0 ligne(s) supprimée(s)
+2026-07-01 03:00:02,054 INFO === Purge terminée ===
+2026-07-01 03:00:02,054 INFO === Purge terminée ===

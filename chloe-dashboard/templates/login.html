@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block title %}Connexion — Dashboard{% endblock %}
+
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Karla:wght@400;500;600&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+  <div class="login-box">
+
+    <div class="login-header">
+      <div class="login-header-logo">
+        <svg width="72" height="72" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="0" cy="0" r="46" fill="none" stroke="#2F4A3C" stroke-width="1.5"/>
+          <circle cx="0" cy="0" r="28" fill="#2F4A3C"/>
+          <line x1="-46" y1="0" x2="-36" y2="0" stroke="#2F4A3C" stroke-width="2"/>
+          <line x1="36" y1="0" x2="46" y2="0" stroke="#2F4A3C" stroke-width="2"/>
+          <line x1="0" y1="-46" x2="0" y2="-36" stroke="#2F4A3C" stroke-width="2"/>
+          <line x1="0" y1="36" x2="0" y2="46" stroke="#2F4A3C" stroke-width="2"/>
+          <circle cx="-46" cy="0" r="3" fill="#D97A3D"/>
+          <circle cx="46" cy="0" r="3" fill="#D97A3D"/>
+          <circle cx="0" cy="-46" r="3" fill="#D97A3D"/>
+          <circle cx="0" cy="46" r="3" fill="#D97A3D"/>
+          <circle cx="0" cy="0" r="18" fill="none" stroke="#D97A3D" stroke-width="1.5"/>
+          <text x="0" y="5" font-family="Georgia, serif" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">IA</text>
+        </svg>
+      </div>
+      <div class="login-header-text">
+        <h1 class="login-header-title">Mon Adjoint IA</h1>
+        <p class="login-header-tagline">Des outils digitaux qui travaillent pour vous</p>
+        <p class="login-header-by">par Sophie Boutemy</p>
+      </div>
+    </div>
+
+    <p class="login-subtitle">Chloé Ludmann</p>
+
+    {% if error %}
+    <div class="alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" class="login-form">
+      <div class="form-group">
+        <label for="username">Identifiant</label>
+        <input type="text" id="username" name="username" required autofocus autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password">
+        <a href="{{ url_for('forgot_password') }}" class="login-secondary-link" style="display:block;text-align:right;margin-top:.4rem;">Mot de passe oublié ?</a>
+      </div>
+      <button type="submit" class="btn-primary" style="display:block;width:auto;margin:20px auto 0;">Se connecter</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

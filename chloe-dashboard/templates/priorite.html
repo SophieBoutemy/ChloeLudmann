@@ -1,0 +1,423 @@
+{% extends 'base.html' %}
+{% block title %}À traiter — Mon Espace Pro{% endblock %}
+
+{% block extra_head %}
+<style>
+
+.priorite-list { display: flex; flex-direction: column; gap: .75rem; }
+.priorite-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.1rem 1.4rem;
+  display: grid;
+  grid-template-columns: 2.5rem 1fr auto;
+  gap: .75rem 1rem;
+  align-items: start;
+}
+.prio-rank {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--border);
+  line-height: 1;
+  padding-top: .15rem;
+}
+.prio-rank.top3 { color: var(--orange); }
+.prio-info { min-width: 0; }
+.prio-name {
+  font-weight: 600;
+  font-size: .9375rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prio-meta {
+  font-size: .78rem;
+  color: var(--muted);
+  font-family: 'Karla', sans-serif;
+  margin-top: .2rem;
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.prio-badge {
+  display: inline-block;
+  font-size: .68rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  padding: .1rem .5rem;
+  border-radius: 10px;
+  background: #f0f2ee;
+  color: var(--text);
+  white-space: nowrap;
+}
+.prio-badge--email { background: #dcfce7; color: #166534; }
+.prio-badge--site  { background: #dbeafe; color: #1e40af; }
+.prio-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: .35rem;
+  min-width: 80px;
+}
+.score-num {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--green);
+  line-height: 1;
+}
+.score-bar-track { width: 80px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.score-bar-fill { height: 100%; background: var(--green); border-radius: 3px; }
+.prio-actions { margin-top: .5rem; display: flex; gap: .5rem; flex-wrap: wrap; }
+.btn-prio-draft {
+  display: inline-flex;
+  align-items: center;
+  padding: .25rem .65rem;
+  background: transparent;
+  border: 1.5px solid var(--green);
+  border-radius: 6px;
+  font-size: .75rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  color: var(--green);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.btn-prio-draft:hover { background: var(--green); color: #fff; }
+
+/* inline statut */
+.prio-statut-select {
+  padding: .2rem .5rem;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  font-size: .75rem;
+  font-family: 'Karla', sans-serif;
+  color: var(--text);
+  background: #fafaf9;
+  cursor: pointer;
+  outline: none;
+  max-width: 130px;
+}
+.prio-statut-select:focus { border-color: var(--green); }
+
+/* Modal (reuse from contacts) */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(0,0,0,.45);
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.75rem;
+  max-width: 620px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
+}
+.modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.1rem; gap: 1rem; }
+.modal-title { font-family: 'Fraunces', Georgia, serif; font-size: 1.15rem; font-weight: 600; color: var(--text); line-height: 1.25; }
+.modal-subtitle { font-size: .8rem; color: var(--muted); font-family: 'Karla', sans-serif; margin-top: .2rem; }
+.modal-close { background: none; border: none; font-size: 1.3rem; color: var(--muted); cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
+.modal-close:hover { color: var(--text); }
+.modal-field { margin-bottom: 1rem; }
+.modal-field label { display: block; font-size: .78rem; font-weight: 600; color: var(--text); font-family: 'Karla', sans-serif; margin-bottom: .35rem; }
+.modal-select, .modal-input, .modal-textarea {
+  width: 100%; padding: .5rem .75rem; border: 1.5px solid var(--border); border-radius: 7px;
+  font-size: .875rem; font-family: 'Inter', sans-serif; color: var(--text); background: #fafaf9;
+  outline: none; box-sizing: border-box; transition: border-color .15s;
+}
+.modal-select:focus, .modal-input:focus, .modal-textarea:focus { border-color: var(--green); background: #fff; }
+.modal-textarea { resize: vertical; min-height: 160px; line-height: 1.5; }
+.modal-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1.2rem; }
+.modal-btn { padding: .5rem 1.1rem; border-radius: 7px; font-size: .875rem; font-weight: 600; font-family: 'Karla', sans-serif; cursor: pointer; border: none; transition: background .15s; }
+.modal-btn--primary { background: var(--green); color: #fff; }
+.modal-btn--primary:hover { background: #2a3b1e; }
+.modal-btn--primary:disabled { background: #9caa91; cursor: default; }
+.modal-btn--secondary { background: #f0f2ee; color: var(--text); border: 1.5px solid var(--border); }
+.modal-btn--secondary:hover { background: #e5e8e2; }
+.modal-btn--copy { background: var(--orange); color: #fff; }
+.modal-btn--copy:hover { background: #EF8F20; }
+.modal-btn--send { background: #2563eb; color: #fff; }
+.modal-btn--send:hover:not(:disabled) { background: #1d4ed8; }
+.modal-btn--send:disabled { background: #93c5fd; cursor: default; }
+.modal-error { font-size: .8rem; color: #dc2626; font-family: 'Karla', sans-serif; margin-top: .5rem; }
+.modal-quota { font-size: .78rem; color: var(--muted); font-family: 'Karla', sans-serif; margin-top: .6rem; }
+.modal-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: .4rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>À traiter</h1>
+    <div class="sub-nav">
+      <a href="{{ url_for('prospection_contacts') }}" class="sub-nav-contacts">Contacts</a>
+      <div class="sub-nav-right">
+        <a href="{{ url_for('prospection_profile') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_profile' %} active{% endif %}">Profil expéditeur</a>
+        <a href="{{ url_for('prospection_today') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_today' %} active{% endif %}">À traiter</a>
+        <a href="{{ url_for('prospection_funnel') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_funnel' %} active{% endif %}">Entonnoir</a>
+      </div>
+    </div>
+  </div>
+  <div class="page-back"><a href="{{ url_for('prospection') }}">← Tableau de bord Adjoint Prospection</a></div>
+</div>
+
+{% if contacts %}
+<p style="font-size:.875rem;color:var(--muted);font-family:'Karla',sans-serif;margin-bottom:1.25rem">
+  Les {{ contacts | length }} contacts avec le meilleur score de priorité — classés par email vérifié, présence web et ancienneté de la structure.
+</p>
+<div class="priorite-list">
+  {% for c in contacts %}
+  {% set rank = loop.index %}
+  <div class="priorite-card">
+    <div class="prio-rank {% if rank <= 3 %}top3{% endif %}">{{ rank }}</div>
+    <div class="prio-info">
+      <div class="prio-name">{{ c.nom_entreprise }}</div>
+      <div class="prio-meta">
+        {% if c.nom_dirigeant %}<span>{{ c.nom_dirigeant }}</span>{% endif %}
+        <span>{{ c.ville }}{% if c.departement %} ({{ c.departement }}){% endif %}</span>
+        <span>{{ c.activite }}</span>
+        {% if c.email %}
+        <span class="prio-badge prio-badge--email">✉ {{ c.email }}</span>
+        {% endif %}
+        {% if c.site_web %}
+        <a href="{{ c.site_web }}" target="_blank" rel="noopener" class="prio-badge prio-badge--site" style="text-decoration:none">
+          {{ c.site_web | replace('https://', '') | replace('http://', '') | truncate(28) }}
+        </a>
+        {% endif %}
+      </div>
+      <div class="prio-actions">
+        <select class="prio-statut-select" data-id="{{ c.id }}" onchange="updateStatut(this)">
+          {% for val, label in statut_options %}
+          <option value="{{ val }}" {% if c.statut == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        {% if c.email %}
+        <button class="btn-prio-draft"
+                onclick="openDraftModal({{ c.id }}, '{{ c.nom_entreprise | replace("'", "\\'") }}', '{{ c.email | replace("'", "\\'") }}', '{{ c.nom_dirigeant | replace("'", "\\'") }}')">
+          ✏ Rédiger
+        </button>
+        {% endif %}
+        <a href="{{ url_for('prospection_contacts') }}?search={{ c.nom_entreprise | urlencode }}"
+           style="font-size:.75rem;color:var(--muted);text-decoration:none;font-family:'Karla',sans-serif">→ Fiche</a>
+      </div>
+    </div>
+    <div class="prio-score">
+      <div class="score-num">{{ c._score }}</div>
+      <div class="score-bar-track">
+        <div class="score-bar-fill" style="width:{{ c._score }}%"></div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div style="text-align:center;padding:4rem;color:var(--muted);font-family:'Karla',sans-serif">
+  Aucun contact à traiter pour l'instant.
+  <a href="{{ url_for('prospection') }}" style="color:var(--green)">Lancer une recherche →</a>
+</div>
+{% endif %}
+
+<!-- Draft Modal -->
+<div class="modal-overlay" id="draft-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="draft-modal-title">Rédiger un email</div>
+        <div class="modal-subtitle" id="draft-modal-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeDraftModal()" title="Fermer">✕</button>
+    </div>
+    <div class="modal-field">
+      <label for="draft-type">Type d'email</label>
+      <select class="modal-select" id="draft-type">
+        {% for key, label in email_types.items() %}
+        <option value="{{ key }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="modal-actions" style="margin-top:.5rem;margin-bottom:1.2rem">
+      <button class="modal-btn modal-btn--primary" id="draft-gen-btn" onclick="generateDraft()">Générer avec l'IA</button>
+    </div>
+    <div id="draft-result" style="display:none">
+      <div class="modal-field">
+        <label for="draft-subject">Objet</label>
+        <input class="modal-input" id="draft-subject" type="text">
+      </div>
+      <div class="modal-field">
+        <label for="draft-body">Corps de l'email</label>
+        <textarea class="modal-textarea" id="draft-body" rows="10"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn--copy" onclick="copyDraft()">Copier</button>
+        <button class="modal-btn" id="draft-mark-btn" onclick="markSent()" style="background:#f0fdf4;color:#166534;border:1.5px solid #86efac;font-family:'Karla',sans-serif">✓ Marquer envoyé</button>
+        <button class="modal-btn modal-btn--primary" id="draft-regen-btn" onclick="generateDraft()">Régénérer</button>
+        {% if smtp_configured %}
+        <button class="modal-btn modal-btn--send" id="draft-send-btn" onclick="sendDraft()">Envoyer</button>
+        {% else %}
+        <a href="{{ url_for('prospection_profile') }}" class="modal-btn modal-btn--secondary" style="text-decoration:none">⚙ Configurer SMTP</a>
+        {% endif %}
+        <button class="modal-btn modal-btn--secondary" onclick="closeDraftModal()">Fermer</button>
+      </div>
+      <div class="modal-quota">
+        Envois aujourd'hui : <span id="modal-quota-count">{{ quota }}</span> / {{ daily_limit }}
+      </div>
+    </div>
+    <div id="draft-error" class="modal-error" style="display:none"></div>
+    <div id="draft-result-hidden" style="display:none">
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn--secondary" onclick="closeDraftModal()">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var _draftContactId = null;
+
+function updateStatut(sel) {
+  fetch('/prospection/contacts/' + sel.dataset.id, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({statut: sel.value}),
+  });
+}
+
+function openDraftModal(id, name, email, dirigeant) {
+  _draftContactId = id;
+  document.getElementById('draft-modal-title').textContent = name;
+  var sub = email || '';
+  if (dirigeant && sub) sub = dirigeant + ' — ' + sub;
+  else if (dirigeant) sub = dirigeant;
+  document.getElementById('draft-modal-sub').textContent = sub;
+  document.getElementById('draft-result').style.display = 'none';
+  document.getElementById('draft-error').style.display = 'none';
+  document.getElementById('draft-result-hidden').style.display = 'none';
+  document.getElementById('draft-modal').classList.add('open');
+}
+
+function closeDraftModal() {
+  document.getElementById('draft-modal').classList.remove('open');
+}
+document.getElementById('draft-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDraftModal();
+});
+
+function generateDraft() {
+  if (!_draftContactId) return;
+  var btn = document.getElementById('draft-gen-btn');
+  var btn2 = document.getElementById('draft-regen-btn');
+  var errEl = document.getElementById('draft-error');
+  errEl.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="modal-spinner"></span>Génération…'; }
+  if (btn2) { btn2.disabled = true; }
+  fetch('/prospection/contacts/' + _draftContactId + '/draft', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email_type: document.getElementById('draft-type').value}),
+  })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
+  .then(function(d) {
+    if (btn) { btn.disabled = false; btn.textContent = "Générer avec l'IA"; }
+    if (btn2) { btn2.disabled = false; }
+    if (d.error) {
+      errEl.textContent = 'Erreur : ' + d.error; errEl.style.display = '';
+      document.getElementById('draft-result-hidden').style.display = '';
+      return;
+    }
+    document.getElementById('draft-subject').value = d.subject || '';
+    document.getElementById('draft-body').value = d.body || '';
+    document.getElementById('draft-result').style.display = '';
+  })
+  .catch(function(e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Générer avec l'IA"; }
+    if (btn2) { btn2.disabled = false; }
+    errEl.textContent = 'Erreur réseau : ' + e.message; errEl.style.display = '';
+    document.getElementById('draft-result-hidden').style.display = '';
+  });
+}
+
+function copyDraft() {
+  var text = 'Objet : ' + document.getElementById('draft-subject').value + '\n\n' + document.getElementById('draft-body').value;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      var btn = event.target;
+      var orig = btn.textContent;
+      btn.textContent = 'Copié !';
+      setTimeout(function() { btn.textContent = orig; }, 1500);
+    });
+  }
+}
+
+function markSent() {
+  if (!_draftContactId) return;
+  if (!confirm('Marquer cet email comme envoyé ? Le statut du contact sera mis à jour.')) return;
+  var emailType = document.getElementById('draft-type').value;
+  var btn = document.getElementById('draft-mark-btn');
+  var errEl = document.getElementById('draft-error');
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  fetch('/prospection/contacts/' + _draftContactId + '/mark-sent', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email_type: emailType}),
+  })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
+  .then(function(d) {
+    if (d.error) {
+      btn.disabled = false; btn.textContent = '✓ Marquer envoyé';
+      errEl.textContent = 'Erreur : ' + d.error; errEl.style.display = ''; return;
+    }
+    btn.textContent = '✓ Envoi enregistré !';
+    setTimeout(function() { closeDraftModal(); }, 700);
+  })
+  .catch(function(e) {
+    btn.disabled = false; btn.textContent = '✓ Marquer envoyé';
+    errEl.textContent = 'Erreur réseau : ' + e.message; errEl.style.display = '';
+  });
+}
+
+function sendDraft() {
+  if (!_draftContactId) return;
+  var subject = document.getElementById('draft-subject').value.trim();
+  var body    = document.getElementById('draft-body').value.trim();
+  if (!subject || !body) { alert("Générez d'abord un brouillon."); return; }
+  if (!confirm('Envoyer cet email ?')) return;
+  var btn = document.getElementById('draft-send-btn');
+  var errEl = document.getElementById('draft-error');
+  errEl.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Envoi…'; }
+  fetch('/prospection/contacts/' + _draftContactId + '/send', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({subject: subject, body: body, email_type: document.getElementById('draft-type').value}),
+  })
+  .then(function(r) { if (!r.ok) throw new Error(r.status === 401 ? 'Session expirée, rechargez la page.' : 'Erreur serveur (' + r.status + ')'); return r.json(); })
+  .then(function(d) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Envoyer'; }
+    if (d.error) { errEl.textContent = 'Erreur : ' + d.error; errEl.style.display = ''; return; }
+    var qel = document.getElementById('modal-quota-count');
+    if (qel) qel.textContent = d.quota;
+    if (btn) { btn.textContent = '✓ Envoyé !'; setTimeout(function(){ btn.textContent = 'Envoyer'; }, 2000); }
+    closeDraftModal();
+  })
+  .catch(function(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Envoyer'; }
+    errEl.textContent = 'Erreur réseau : ' + e.message; errEl.style.display = '';
+  });
+}
+</script>
+{% endblock %}

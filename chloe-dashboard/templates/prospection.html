@@ -1,0 +1,561 @@
+{% extends 'base.html' %}
+{% block title %}Prospection — Mon Espace Pro{% endblock %}
+
+{% block extra_head %}
+<style>
+.pro-grid { display: flex; flex-direction: column; gap: 2rem; }
+
+/* Stats */
+.stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+@media (max-width: 640px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
+.stat-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.2rem 1.4rem;
+  text-align: center;
+}
+.stat-value {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--green);
+  line-height: 1;
+  margin-bottom: .3rem;
+}
+.stat-label { font-size: .8rem; color: var(--muted); font-family: 'Karla', sans-serif; }
+
+/* Progress */
+.task-box {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.4rem 1.6rem;
+}
+.task-message { font-size: .9rem; color: var(--text); margin-bottom: .8rem; }
+.progress-track { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--green); border-radius: 4px; transition: width .3s ease; }
+.task-meta { font-size: .78rem; color: var(--muted); margin-top: .5rem; font-family: 'Karla', sans-serif; }
+.task-params {
+  font-size: .78rem;
+  color: var(--muted);
+  font-family: 'Karla', sans-serif;
+  margin-top: .4rem;
+  padding-top: .4rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Form card */
+.form-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.6rem;
+}
+.form-card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  font-family: 'Karla', sans-serif;
+  margin-bottom: 1.2rem;
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 1.2rem; }
+@media (max-width: 580px) { .form-row { grid-template-columns: 1fr; } }
+
+.field label { display: block; font-size: .8125rem; font-weight: 600; color: var(--text); margin-bottom: .4rem; font-family: 'Karla', sans-serif; }
+.field input[type=text], .field input[type=number] {
+  width: 100%;
+  padding: .5rem .75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: .875rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
+  background: #fafaf9;
+  outline: none;
+  transition: border-color .15s;
+}
+.field input:focus { border-color: var(--green); background: #fff; }
+.field-hint { font-size: .75rem; color: var(--muted); margin-top: .3rem; }
+
+/* Accordion NAF */
+.naf-field-label {
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--text);
+  font-family: 'Karla', sans-serif;
+  margin-bottom: .6rem;
+  display: block;
+}
+.naf-accordion { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1.2rem; }
+
+details.naf-cat {
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+details.naf-cat[open] { border-color: #c5d4bb; }
+
+summary.naf-cat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .6rem 1rem;
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  background: #fafaf9;
+  user-select: none;
+  list-style: none;
+  gap: .5rem;
+}
+summary.naf-cat-header::-webkit-details-marker { display: none; }
+details.naf-cat[open] summary.naf-cat-header { background: #f2f5ef; }
+
+.naf-cat-title { flex: 1; }
+.naf-cat-count {
+  font-size: .72rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: #ede9e4;
+  border-radius: 10px;
+  padding: .1rem .55rem;
+  white-space: nowrap;
+  font-family: 'Karla', sans-serif;
+}
+details.naf-cat[open] .naf-cat-count { background: #d4e0cb; color: #354626; }
+.naf-cat-chevron {
+  font-size: .65rem;
+  color: var(--muted);
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+details.naf-cat[open] .naf-cat-chevron { transform: rotate(180deg); }
+
+.naf-cat-body {
+  padding: .65rem 1rem .75rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .3rem .8rem;
+  border-top: 1px solid var(--border);
+  background: #fff;
+}
+@media (max-width: 540px) { .naf-cat-body { grid-template-columns: 1fr; } }
+
+.naf-check-label {
+  display: flex;
+  align-items: flex-start;
+  gap: .45rem;
+  font-size: .8rem;
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1.35;
+  padding: .15rem 0;
+}
+.naf-check-label input[type=checkbox] {
+  accent-color: var(--green);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: .15rem;
+}
+.naf-code-tag {
+  font-size: .72rem;
+  color: var(--muted);
+  font-family: 'Karla', sans-serif;
+  white-space: nowrap;
+}
+
+/* Tranche checkboxes */
+.tranche-field { margin-bottom: 1.2rem; }
+.tranche-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .3rem .8rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: .65rem 1rem .75rem;
+  background: #fafaf9;
+}
+@media (max-width: 580px) { .tranche-grid { grid-template-columns: 1fr 1fr; } }
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-top: 1.2rem;
+  margin-bottom: 1.4rem;
+}
+.toggle-label { font-size: .875rem; color: var(--text); font-family: 'Karla', sans-serif; }
+.toggle-hint  { font-size: .75rem; color: var(--muted); }
+
+/* Buttons */
+.form-actions { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.fa-btn {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  height: 2.35rem;
+  box-sizing: border-box;
+  padding: 0 1.4rem;
+  border: 1.5px solid var(--green);
+  border-radius: 7px;
+  font-size: .875rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  margin: 0;
+  transition: background .15s;
+}
+.fa-btn--filled  { background: var(--green); color: #fff; }
+.fa-btn--filled:hover { background: #2a3b1e; }
+.fa-btn--filled:disabled { background: #9caa91; border-color: #9caa91; cursor: default; }
+.fa-btn--outline { background: transparent; color: var(--green); }
+.fa-btn--outline:hover { background: #f0f2ee; }
+
+/* Country selector */
+.country-tabs { display: flex; gap: .5rem; margin-bottom: 1.4rem; }
+.country-tab {
+  flex: 1;
+  padding: .6rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-size: .875rem;
+  font-weight: 600;
+  font-family: 'Karla', sans-serif;
+  cursor: pointer;
+  background: #fafaf9;
+  color: var(--muted);
+  text-align: center;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.country-tab.active { border-color: var(--green); background: #f0f5ed; color: var(--green); }
+.country-tab:hover:not(.active) { background: #f5f3f0; }
+
+/* CH keywords */
+.ch-keywords-textarea {
+  width: 100%;
+  padding: .5rem .75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: .875rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
+  background: #fafaf9;
+  outline: none;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 90px;
+  line-height: 1.5;
+  transition: border-color .15s;
+}
+.ch-keywords-textarea:focus { border-color: var(--green); background: #fff; }
+.canton-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .3rem .6rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: .65rem 1rem .75rem;
+  background: #fafaf9;
+}
+@media (max-width: 580px) { .canton-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* NAF breakdown */
+.naf-breakdown { display: flex; flex-direction: column; gap: .5rem; }
+.naf-row-item { display: flex; align-items: center; gap: .75rem; font-size: .8125rem; }
+.naf-row-item .naf-act { flex: 1; color: var(--text); }
+.naf-row-item .naf-count { font-weight: 600; color: var(--green); min-width: 2rem; text-align: right; }
+.naf-row-item .naf-bar-track { width: 100px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+.naf-bar-fill { height: 100%; background: var(--orange); border-radius: 3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Adjoint Prospection</h1>
+    <div class="sub-nav">
+      <a href="{{ url_for('prospection_contacts') }}" class="sub-nav-contacts">Contacts</a>
+      <div class="sub-nav-right">
+        <a href="{{ url_for('prospection_profile') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_profile' %} active{% endif %}">Profil expéditeur</a>
+        <a href="{{ url_for('prospection_today') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_today' %} active{% endif %}">À traiter</a>
+        <a href="{{ url_for('prospection_funnel') }}" class="sub-nav-btn{% if request.endpoint == 'prospection_funnel' %} active{% endif %}">Entonnoir</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pro-grid">
+
+  <!-- Stats -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Contacts collectés</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.avec_email }}</div>
+      <div class="stat-label">Avec email</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.avec_site }}</div>
+      <div class="stat-label">Avec site web</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.contactes }}</div>
+      <div class="stat-label">Contactés</div>
+    </div>
+  </div>
+
+  <!-- Task progress -->
+  <div id="task-box" class="task-box" style="{% if not task.running and not task.finished %}display:none{% endif %}">
+    <div class="task-message" id="task-message">{{ task.message }}</div>
+    <div class="progress-track">
+      <div class="progress-bar" id="task-bar"
+           style="width:{% if task.total > 0 %}{{ (task.progress / task.total * 100)|round|int }}{% else %}0{% endif %}%"></div>
+    </div>
+    <div class="task-meta" id="task-meta">
+      {% if task.running %}En cours…{% elif task.finished %}Terminé le {{ task.finished }}{% endif %}
+    </div>
+    {% if task.search_params %}
+    <div class="task-params" id="task-params">{{ task.search_params }}</div>
+    {% else %}
+    <div class="task-params" id="task-params" style="display:none"></div>
+    {% endif %}
+  </div>
+
+  <!-- Search form -->
+  <div class="form-card">
+    <h2>Lancer une recherche</h2>
+    <form method="post" action="{{ url_for('prospection_run') }}" id="search-form">
+      <input type="hidden" name="country" id="country-input" value="FR">
+
+      <!-- Country selector -->
+      <div class="country-tabs">
+        <button type="button" class="country-tab active" id="tab-fr" onclick="selectCountry('FR')">🇫🇷 France</button>
+        <button type="button" class="country-tab" id="tab-ch" onclick="selectCountry('CH')">🇨🇭 Suisse</button>
+        <button type="button" class="country-tab" id="tab-be" onclick="selectCountry('BE')">🇧🇪 Belgique</button>
+      </div>
+
+      <!-- France section -->
+      <div id="fr-section">
+      <span class="naf-field-label">Secteurs d'activité (NAF)</span>
+      <div class="naf-accordion">
+        {% for cat in secteurs %}
+        {% set cat_idx = loop.index %}
+        <details class="naf-cat">
+          <summary class="naf-cat-header">
+            <span class="naf-cat-title">{{ cat.categorie }}</span>
+            <span class="naf-cat-count" data-cat="{{ cat_idx }}">{{ cat.codes | length }} code{{ 's' if cat.codes | length > 1 }}</span>
+            <span class="naf-cat-chevron">▼</span>
+          </summary>
+          <div class="naf-cat-body">
+            {% for item in cat.codes %}
+            <label class="naf-check-label">
+              <input type="checkbox" name="naf_codes" value="{{ item.code }}"
+                     data-cat="{{ cat_idx }}"
+                     onchange="updateCount({{ cat_idx }})">
+              <span>{{ item.label }} <span class="naf-code-tag">({{ item.code }})</span></span>
+            </label>
+            {% endfor %}
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+
+      <div class="tranche-field">
+        <span class="naf-field-label">Taille d'entreprise (effectif salarié)</span>
+        <div class="tranche-grid">
+          {% for code, label in tranche_labels.items() %}
+          <label class="naf-check-label">
+            <input type="checkbox" name="tranche_effectif" value="{{ code }}">
+            <span>{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="field-hint" style="margin-top:.4rem">Cochez une ou plusieurs tailles. Sans sélection = toutes tailles.</div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="departements">Départements</label>
+          <input type="text" id="departements" name="departements"
+                 placeholder="35, 44, 56…" autocomplete="off">
+          <div class="field-hint">Séparés par des virgules. Laisser vide = toute la France.</div>
+        </div>
+      </div>
+      </div><!-- end #fr-section -->
+
+      <!-- Switzerland section -->
+      <div id="ch-section" style="display:none">
+        <div class="field" style="margin-bottom:1.2rem">
+          <label for="ch_keywords">Mots-clés de recherche <span style="font-weight:400;color:var(--muted)">(un par ligne)</span></label>
+          <textarea id="ch_keywords" name="ch_keywords" class="ch-keywords-textarea"
+                    placeholder="boulangerie&#10;pâtisserie&#10;restaurant"></textarea>
+          <div class="field-hint">Chaque mot-clé est recherché dans le registre Zefix.</div>
+        </div>
+        <div class="tranche-field">
+          <span class="naf-field-label">Cantons</span>
+          <div class="canton-grid">
+            {% set cantons = [('VD','Vaud'),('GE','Genève'),('NE','Neuchâtel'),('FR','Fribourg'),('JU','Jura'),('VS','Valais'),('BE','Berne'),('ZH','Zurich'),('AG','Argovie'),('LU','Lucerne'),('SG','Saint-Gall'),('TI','Tessin'),('BS','Bâle-Ville'),('BL','Bâle-Camp.'),('SO','Soleure'),('ZG','Zoug'),('SZ','Schwytz'),('GR','Grisons'),('TG','Thurgovie'),('SH','Schaffhouse'),('OW','Obwald'),('NW','Nidwald'),('GL','Glaris'),('UR','Uri'),('AR','App. Ext.'),('AI','App. Int.')] %}
+            {% for code, label in cantons %}
+            <label class="naf-check-label">
+              <input type="checkbox" name="ch_cantons" value="{{ code }}">
+              <span>{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div class="field-hint" style="margin-top:.4rem">Sans sélection = tous les cantons.</div>
+        </div>
+      </div><!-- end #ch-section -->
+      <!-- Belgium section -->
+      <div id="be-section" style="display:none">
+        <div class="field" style="margin-bottom:1.2rem">
+          <label for="be_keywords">Mots-clés de recherche <span style="font-weight:400;color:var(--muted)">(un par ligne)</span></label>
+          <textarea id="be_keywords" name="be_keywords" class="ch-keywords-textarea"
+                    placeholder="boulangerie&#10;pâtisserie&#10;restaurant"></textarea>
+          <div class="field-hint">Chaque mot-clé est recherché dans le registre BCE belge.</div>
+        </div>
+        <div class="tranche-field">
+          <span class="naf-field-label">Provinces</span>
+          <div class="canton-grid">
+            {% set provinces_be = [('BRU','Bruxelles'),('ANT','Anvers'),('OVL','Flandre-Orientale'),('WVL','Flandre-Occidentale'),('VBR','Brabant Flamand'),('LIM','Limbourg'),('HAI','Hainaut'),('LGE','Liège'),('LUX','Luxembourg'),('NAM','Namur'),('WBR','Brabant Wallon')] %}
+            {% for code, label in provinces_be %}
+            <label class="naf-check-label">
+              <input type="checkbox" name="be_provinces" value="{{ code }}">
+              <span>{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div class="field-hint" style="margin-top:.4rem">Sans sélection = toute la Belgique.</div>
+        </div>
+      </div><!-- end #be-section -->
+
+      <div class="form-row">
+        <div class="field">
+          <label for="max_results">Nombre max de résultats</label>
+          <input type="number" id="max_results" name="max_results"
+                 value="30" min="5" max="200">
+          <div class="field-hint">Entre 5 et 200.</div>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <input type="hidden" name="enrichissement" value="0">
+        <input type="checkbox" id="enrichissement" name="enrichissement" value="1" checked
+               style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
+        <div>
+          <div class="toggle-label">Enrichissement automatique (site web + email)</div>
+          <div class="toggle-hint">Ralentit la recherche (~1s par contact) mais améliore considérablement les résultats.</div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="fa-btn fa-btn--filled" id="submit-btn"
+                {% if task.running %}disabled{% endif %}>
+          {% if task.running %}Recherche en cours…{% else %}Lancer la recherche{% endif %}
+        </button>
+        {% if stats.total > 0 %}
+        <a href="{{ url_for('prospection_contacts') }}" class="fa-btn fa-btn--outline">Voir les contacts →</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- NAF breakdown -->
+  {% if stats.par_naf %}
+  <div class="form-card">
+    <h2>Répartition par secteur</h2>
+    {% set max_count = stats.par_naf.values() | map(attribute='count') | max %}
+    <div class="naf-breakdown">
+      {% for code, info in stats.par_naf.items() | sort(attribute='1.count', reverse=True) %}
+      <div class="naf-row-item">
+        <span class="naf-act">{{ info.activite }}</span>
+        <div class="naf-bar-track">
+          <div class="naf-bar-fill" style="width:{{ (info.count / max_count * 100)|round|int }}%"></div>
+        </div>
+        <span class="naf-count">{{ info.count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function selectCountry(c) {
+  document.getElementById('country-input').value = c;
+  document.getElementById('fr-section').style.display = c === 'FR' ? '' : 'none';
+  document.getElementById('ch-section').style.display = c === 'CH' ? '' : 'none';
+  document.getElementById('be-section').style.display = c === 'BE' ? '' : 'none';
+  document.getElementById('tab-fr').classList.toggle('active', c === 'FR');
+  document.getElementById('tab-ch').classList.toggle('active', c === 'CH');
+  document.getElementById('tab-be').classList.toggle('active', c === 'BE');
+}
+
+function updateCount(catIdx) {
+  var checked = document.querySelectorAll('input[data-cat="' + catIdx + '"]:checked').length;
+  var total   = document.querySelectorAll('input[data-cat="' + catIdx + '"]').length;
+  var badge   = document.querySelector('.naf-cat-count[data-cat="' + catIdx + '"]');
+  if (!badge) return;
+  badge.textContent = checked > 0
+    ? checked + ' sélectionné' + (checked > 1 ? 's' : '')
+    : total + ' code' + (total > 1 ? 's' : '');
+}
+
+(function () {
+  var box    = document.getElementById('task-box');
+  var bar    = document.getElementById('task-bar');
+  var msg    = document.getElementById('task-message');
+  var meta   = document.getElementById('task-meta');
+  var params = document.getElementById('task-params');
+  var btn    = document.getElementById('submit-btn');
+  var running = {{ 'true' if task.running else 'false' }};
+
+  function poll() {
+    fetch('{{ url_for("prospection_status") }}')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        box.style.display = '';
+        msg.textContent  = d.message;
+        meta.textContent = d.running ? 'En cours…' : (d.finished ? 'Terminé le ' + d.finished : '');
+        bar.style.width  = (d.total > 0 ? Math.round(d.progress / d.total * 100) : 0) + '%';
+        if (d.search_params) {
+          params.textContent = d.search_params;
+          params.style.display = '';
+        } else {
+          params.style.display = 'none';
+        }
+        if (d.running) {
+          btn.disabled    = true;
+          btn.textContent = 'Recherche en cours…';
+          setTimeout(poll, 2000);
+        } else {
+          btn.disabled    = false;
+          btn.textContent = 'Lancer la recherche';
+          if (running) setTimeout(function() { location.reload(); }, 1500);
+        }
+        running = d.running;
+      })
+      .catch(function() { if (running) setTimeout(poll, 3000); });
+  }
+
+  if (running) poll();
+
+  document.getElementById('search-form').addEventListener('submit', function() {
+    btn.disabled    = true;
+    btn.textContent = 'Démarrage…';
+    setTimeout(poll, 1500);
+  });
+})();
+</script>
+{% endblock %}

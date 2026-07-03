@@ -1,0 +1,536 @@
+{% extends 'base.html' %}
+
+{% block title %}Base Élèves — Mon Adjoint IA{% endblock %}
+
+{% block extra_head %}
+<style>
+a.back { font-size:.875rem; color:var(--muted); text-decoration:none; }
+a.back:hover { color:var(--green); }
+
+.count-badge {
+  display:inline-block; background:var(--green); color:#fff;
+  font-size:.7rem; font-weight:600; padding:.15rem .55rem;
+  border-radius:20px; margin-left:.4rem; vertical-align:middle;
+}
+
+/* Filters */
+.filters-wrap {
+  background:#fff; border-radius:8px;
+  padding:1rem 1.1rem; margin-bottom:1.1rem;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+.filters-controls {
+  display:flex; flex-wrap:wrap; gap:.55rem; align-items:center; width:100%;
+}
+.filter-select, .filter-input {
+  padding:.38rem .7rem; border:1.5px solid var(--border); border-radius:6px;
+  font-size:.8125rem; font-family:inherit; color:var(--text);
+  background:#fff; outline:none; cursor:pointer; height:32px;
+}
+.filter-select:focus, .filter-input:focus { border-color:var(--green); }
+.filter-input { min-width:200px; cursor:text; }
+.filters-spacer { flex:1; }
+.filters-actions { display:flex; gap:.5rem; margin-left:auto; }
+
+.btn-sm {
+  display:inline-block; padding:.38rem .9rem; border-radius:6px; border:none;
+  font-size:.8125rem; font-weight:500; font-family:inherit; cursor:pointer;
+  text-decoration:none; transition:background .15s; white-space:nowrap; height:32px;
+}
+.btn-sm-outline { background:transparent; color:var(--green); border:1.5px solid var(--green); }
+.btn-sm-outline:hover { background:#f0f4ee; }
+.btn-sm-orange { background:var(--orange); color:#fff; }
+.btn-sm-orange:hover { background:#c46c0a; }
+.btn-sm-green { background:var(--green); color:#fff; }
+.btn-sm-green:hover { background:#2a3a1e; }
+
+/* Table */
+.table-wrap {
+  overflow-x:auto; border-radius:8px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08); background:#fff;
+}
+table {
+  width:100%; border-collapse:collapse; font-size:.8125rem;
+  white-space:nowrap;
+}
+thead th {
+  background:var(--green); color:#fff; font-weight:500;
+  padding:.6rem .8rem; text-align:left; position:sticky; top:0; z-index:1;
+  white-space:nowrap;
+}
+thead th:first-child { border-radius:var(--radius) 0 0 0; }
+thead th:last-child  { border-radius:0 var(--radius) 0 0; }
+
+tbody tr {
+  border-bottom:1px solid #f0ece8; transition:background .1s;
+}
+tbody tr:hover { background:#faf8f6; }
+tbody tr:last-child { border-bottom:none; }
+
+td { padding:.4rem .6rem; color:var(--text); }
+td.td-email { font-weight:500; color:var(--green); max-width:180px; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+td.td-date  { color:var(--muted); font-size:.775rem; white-space:nowrap; }
+td.td-action { white-space:nowrap; }
+td.td-link  { cursor:pointer; }
+.muted { color:var(--muted); }
+
+/* Inline edit */
+[contenteditable="true"] {
+  min-width:80px; display:inline-block; padding:.15rem .3rem;
+  border-radius:4px; outline:none; cursor:text;
+  white-space:normal; word-break:break-word;
+  max-width:200px;
+}
+[contenteditable="true"]:hover { background:#f0f4ee; }
+[contenteditable="true"]:focus {
+  background:#fff; box-shadow:0 0 0 2px var(--green);
+}
+[contenteditable="true"].saving { opacity:.5; }
+[contenteditable="true"].saved { box-shadow:0 0 0 2px #22c55e; }
+[contenteditable="true"].error { box-shadow:0 0 0 2px #ef4444; }
+
+.cell-select {
+  padding:.2rem .35rem; border:1.5px solid var(--border); border-radius:4px;
+  font-size:.8rem; font-family:inherit; color:var(--text);
+  background:#fff; cursor:pointer; outline:none;
+  max-width:150px;
+}
+.cell-select:focus { border-color:var(--green); }
+
+/* Badges */
+.badge {
+  display:inline-block; padding:.13rem .5rem; border-radius:20px;
+  font-size:.72rem; font-weight:500; white-space:nowrap;
+}
+.badge-signe   { background:#dcfce7; color:#166534; }
+.badge-attente { background:#fff0d9; color:#9a4500; }
+.badge-relance { background:#e0f2fe; color:#0369a1; }
+.badge-default { background:#f3f4f6; color:#6b7280; }
+.badge-type {
+  display:inline-block; padding:.1rem .45rem; border-radius:20px;
+  font-size:.7rem; background:#f0f4ee; color:var(--green);
+  margin-right:.2rem; margin-bottom:.1rem;
+}
+
+/* Relancer / delete buttons */
+.btn-relancer, .btn-delete {
+  padding:.2rem .55rem; font-size:.75rem; font-weight:500; font-family:inherit;
+  border:none; border-radius:5px; cursor:pointer; transition:background .15s;
+}
+.btn-relancer { background:var(--orange); color:#fff; }
+.btn-relancer:hover    { background:#c46c0a; }
+.btn-relancer:disabled { opacity:.5; cursor:not-allowed; }
+.btn-delete { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; margin-left:.25rem; }
+.btn-delete:hover { background:#fee2e2; }
+
+.alert-error {
+  background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;
+  border-radius:6px; padding:.75rem 1rem; margin-bottom:1.1rem; font-size:.875rem;
+}
+.empty-state { text-align:center; padding:3rem 1rem; color:var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Base Élèves <span class="count-badge" id="count">{{ eleves|length }}</span></h1>
+    <a href="{{ url_for('index') }}" class="back">← Tableau de bord</a>
+  </div>
+</div>
+
+{% if error %}
+<div class="alert-error">Erreur Notion : {{ error }}</div>
+{% endif %}
+
+<div class="filters-wrap">
+  <div class="filters-controls">
+    <input class="filter-input" id="f-search" type="text" placeholder="Rechercher email, nom, infos…" oninput="applyFilters()">
+
+    <select class="filter-select" id="f-statut" onchange="applyFilters()">
+      <option value="">Statut contrat</option>
+      {% for s in opts.statut_contrat %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+    </select>
+
+    <select class="filter-select" id="f-boite" onchange="applyFilters()">
+      <option value="">Boîte mail</option>
+      {% for b in opts.boite_mail %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
+    </select>
+
+    <select class="filter-select" id="f-type" onchange="applyFilters()">
+      <option value="">Type d'élève</option>
+      {% for t in opts.type_eleve %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select>
+
+    <select class="filter-select" id="f-rattrapage" onchange="applyFilters()">
+      <option value="">Rattrapage</option>
+      <option value="oui">Avec rattrapage</option>
+      <option value="non">Sans rattrapage</option>
+    </select>
+
+    <select class="filter-select" id="f-calendly" onchange="applyFilters()">
+      <option value="">Infos Calendly</option>
+      <option value="oui">Avec Calendly</option>
+      <option value="non">Sans Calendly</option>
+    </select>
+
+    <select class="filter-select" id="f-contrat" onchange="applyFilters()">
+      <option value="">Contrat envoyé</option>
+      <option value="oui">Contrat renseigné</option>
+      <option value="non">Sans date contrat</option>
+    </select>
+
+    <select class="filter-select" id="f-newsletter" onchange="applyFilters()">
+      <option value="">Newsletter</option>
+      <option value="oui">Newsletter envoyée</option>
+      <option value="non">Pas de newsletter</option>
+    </select>
+
+    <div class="filters-spacer"></div>
+    <div class="filters-actions">
+      <button class="btn-sm btn-sm-outline" onclick="resetFilters()">Réinitialiser</button>
+      <button class="btn-sm btn-sm-orange" onclick="exportExcel()">Export Excel</button>
+      <button class="btn-sm btn-sm-green" onclick="window.location.reload()">Rafraîchir</button>
+    </div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Nom complet</th>
+        <th>Type d'élève</th>
+        <th>Rattrapage</th>
+        <th>Infos</th>
+        <th>Boîte mail</th>
+        <th>Date du mail</th>
+        <th>Infos Calendly</th>
+        <th>Résumé du mail</th>
+        <th>Date newsletter</th>
+        <th>Date contrat</th>
+        <th>Statut contrat</th>
+        <th>Relancer</th>
+        <th>Date de relance</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      {% for e in eleves %}
+      <tr class="eleve-row"
+          data-id="{{ e.id }}"
+          data-statut="{{ e.statut_contrat }}"
+          data-boite="{{ e.boite_mail }}"
+          data-type="{{ e.type_eleve }}"
+          data-rattrapage="{{ 'oui' if e.rattrapage else 'non' }}"
+          data-calendly="{{ 'oui' if e.infos_calendly else 'non' }}"
+          data-contrat="{{ 'oui' if e.date_contrat else 'non' }}"
+          data-newsletter="{{ 'oui' if e.date_newsletter else 'non' }}"
+          data-search="{{ (e.email ~ ' ' ~ e.nom ~ ' ' ~ e.infos ~ ' ' ~ e.infos_calendly ~ ' ' ~ e.resume_mail ~ ' ' ~ e.rattrapage)|lower }}">
+
+        {# Email — read-only, click → detail #}
+        <td class="td-email td-link" onclick="goToEleve('{{ e.id }}')" title="{{ e.email }}">{{ e.email or '—' }}</td>
+
+        {# Nom complet — editable rich_text #}
+        <td>
+          <span contenteditable="true"
+                data-id="{{ e.id }}" data-field="nom"
+                onblur="saveField(this)">{{ e.nom or '' }}</span>
+        </td>
+
+        {# Type d'élève — multi_select dropdown #}
+        <td>
+          <select class="cell-select" data-id="{{ e.id }}" data-field="type_eleve" onchange="saveSelect(this)">
+            <option value="">—</option>
+            {% for t in opts.type_eleve %}
+            <option value="{{ t }}" {% if t == e.type_eleve or t in e.type_eleve.split(', ') %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </td>
+
+        {# Rattrapage — editable rich_text #}
+        <td>
+          <span contenteditable="true"
+                data-id="{{ e.id }}" data-field="rattrapage"
+                onblur="saveField(this)">{{ e.rattrapage or '' }}</span>
+        </td>
+
+        {# Infos — editable rich_text #}
+        <td>
+          <span contenteditable="true"
+                data-id="{{ e.id }}" data-field="infos"
+                onblur="saveField(this)" style="max-width:180px;">{{ e.infos or '' }}</span>
+        </td>
+
+        {# Boîte mail — select dropdown #}
+        <td>
+          <select class="cell-select" data-id="{{ e.id }}" data-field="boite_mail" onchange="saveSelect(this)">
+            <option value="">—</option>
+            {% for b in opts.boite_mail %}
+            <option value="{{ b }}" {% if b == e.boite_mail %}selected{% endif %}>{{ b }}</option>
+            {% endfor %}
+          </select>
+        </td>
+
+        {# Date du mail — read-only #}
+        <td class="td-date td-link" onclick="goToEleve('{{ e.id }}')">{{ e.date_mail or '—' }}</td>
+
+        {# Infos Calendly — editable rich_text #}
+        <td>
+          <span contenteditable="true"
+                data-id="{{ e.id }}" data-field="infos_calendly"
+                onblur="saveField(this)" style="max-width:180px;">{{ e.infos_calendly or '' }}</span>
+        </td>
+
+        {# Résumé du mail — read-only #}
+        <td class="td-link" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;"
+            onclick="goToEleve('{{ e.id }}')" title="{{ e.resume_mail }}">
+          {{ e.resume_mail[:60] ~ '…' if e.resume_mail|length > 60 else (e.resume_mail or '—') }}
+        </td>
+
+        {# Date newsletter — read-only #}
+        <td class="td-date td-link" onclick="goToEleve('{{ e.id }}')">{{ e.date_newsletter or '—' }}</td>
+
+        {# Date contrat — read-only #}
+        <td class="td-date td-link" onclick="goToEleve('{{ e.id }}')">{{ e.date_contrat or '—' }}</td>
+
+        {# Statut contrat — select dropdown #}
+        <td>
+          <select class="cell-select" data-id="{{ e.id }}" data-field="statut_contrat" onchange="saveSelect(this); refreshStatutBadge(this)">
+            <option value="">—</option>
+            {% for s in opts.statut_contrat %}
+            <option value="{{ s }}" {% if s == e.statut_contrat %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </td>
+
+        {# Relancer — shown if statut = En attente #}
+        <td class="td-action">
+          <span class="relancer-cell">
+          {% if e.statut_contrat == 'En attente' %}
+          <button class="btn-relancer" onclick="relancer(event, '{{ e.id }}', this)">Relancer</button>
+          {% else %}<span class="muted">—</span>{% endif %}
+          </span>
+        </td>
+
+        {# Date de relance — read-only #}
+        <td class="td-date td-link" onclick="goToEleve('{{ e.id }}')">{{ e.date_relance or '—' }}</td>
+
+        {# Supprimer #}
+        <td class="td-action">
+          <button class="btn-delete" onclick="supprimerEleve(event, '{{ e.id }}', this)">✕</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="15" class="empty-state">Aucun élève trouvé.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+const ELEVES_BASE   = "{{ url_for('eleves') }}";
+const ELEVES_EXPORT = "{{ url_for('eleves_export') }}";
+
+/* ── Filtering ── */
+function applyFilters() {
+  const statut     = document.getElementById('f-statut').value;
+  const boite      = document.getElementById('f-boite').value;
+  const type       = document.getElementById('f-type').value;
+  const rattrapage = document.getElementById('f-rattrapage').value;
+  const calendly   = document.getElementById('f-calendly').value;
+  const contrat    = document.getElementById('f-contrat').value;
+  const newsletter = document.getElementById('f-newsletter').value;
+  const search     = document.getElementById('f-search').value.toLowerCase();
+  let visible = 0;
+
+  document.querySelectorAll('.eleve-row').forEach(row => {
+    const d = row.dataset;
+    const rowTypes = d.type ? d.type.split(',').map(s => s.trim()) : [];
+    const ok =
+      (!statut     || d.statut === statut)                       &&
+      (!boite      || d.boite  === boite)                        &&
+      (!type       || rowTypes.includes(type))                   &&
+      (!rattrapage || d.rattrapage === rattrapage)               &&
+      (!calendly   || d.calendly   === calendly)                 &&
+      (!contrat    || d.contrat    === contrat)                  &&
+      (!newsletter || d.newsletter === newsletter)               &&
+      (!search     || d.search.includes(search));
+    row.style.display = ok ? '' : 'none';
+    if (ok) visible++;
+  });
+  document.getElementById('count').textContent = visible;
+}
+
+function resetFilters() {
+  ['f-statut','f-boite','f-type','f-rattrapage','f-calendly','f-contrat','f-newsletter']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-search').value = '';
+  applyFilters();
+}
+
+/* ── Navigation ── */
+function goToEleve(id) {
+  window.location.href = ELEVES_BASE + '/' + id;
+}
+
+/* ── Export ── */
+function exportExcel() {
+  const params = new URLSearchParams();
+  const statut = document.getElementById('f-statut').value;
+  const boite  = document.getElementById('f-boite').value;
+  const type   = document.getElementById('f-type').value;
+  if (statut) params.set('statut', statut);
+  if (boite)  params.set('boite', boite);
+  if (type)   params.set('type', type);
+  window.location.href = ELEVES_EXPORT + '?' + params.toString();
+}
+
+/* ── Inline editing ── */
+function saveField(el) {
+  const id    = el.dataset.id;
+  const field = el.dataset.field;
+  const value = el.textContent.trim();
+  el.classList.add('saving');
+  fetch(ELEVES_BASE + '/' + id + '/property', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({field, value}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    el.classList.remove('saving');
+    if (data.ok) {
+      el.classList.add('saved');
+      // update data-search on the row
+      updateRowSearch(el.closest('tr'));
+      setTimeout(() => el.classList.remove('saved'), 1200);
+    } else {
+      el.classList.add('error');
+      setTimeout(() => el.classList.remove('error'), 2000);
+      console.error('Erreur save:', data.error);
+    }
+  })
+  .catch(() => {
+    el.classList.remove('saving');
+    el.classList.add('error');
+    setTimeout(() => el.classList.remove('error'), 2000);
+  });
+}
+
+function saveSelect(el) {
+  const id    = el.dataset.id;
+  const field = el.dataset.field;
+  const value = el.value;
+  fetch(ELEVES_BASE + '/' + id + '/property', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({field, value}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.ok) {
+      console.error('Erreur save select:', data.error);
+      el.style.boxShadow = '0 0 0 2px #ef4444';
+      setTimeout(() => el.style.boxShadow = '', 2000);
+    } else {
+      el.style.boxShadow = '0 0 0 2px #22c55e';
+      setTimeout(() => el.style.boxShadow = '', 1200);
+      // update row dataset
+      const row = el.closest('tr');
+      if (field === 'boite_mail')     row.dataset.boite  = value;
+      if (field === 'statut_contrat') row.dataset.statut = value;
+      if (field === 'type_eleve')     row.dataset.type   = value;
+    }
+  })
+  .catch(() => {
+    el.style.boxShadow = '0 0 0 2px #ef4444';
+    setTimeout(() => el.style.boxShadow = '', 2000);
+  });
+}
+
+function refreshStatutBadge(el) {
+  const value = el.value;
+  const row = el.closest('tr');
+  // Update relancer cell visibility
+  const relCell = row.querySelector('.relancer-cell');
+  const id = row.dataset.id;
+  if (value === 'En attente') {
+    relCell.innerHTML = '<button class="btn-relancer" onclick="relancer(event, \'' + id + '\', this)">Relancer</button>';
+  } else {
+    relCell.innerHTML = '<span class="muted">—</span>';
+  }
+}
+
+function updateRowSearch(row) {
+  const texts = Array.from(row.querySelectorAll('[contenteditable]'))
+    .map(el => el.textContent).join(' ');
+  row.dataset.search = (row.dataset.search.split(' ')[0] + ' ' + texts).toLowerCase();
+}
+
+/* ── Relancer ── */
+function relancer(event, id, btn) {
+  event.stopPropagation();
+  if (!confirm('Envoyer une relance pour cet élève ?')) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  fetch(ELEVES_BASE + '/' + id + '/relancer', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        // Update statut select
+        const row = btn.closest('tr');
+        const sel = row.querySelector('select[data-field="statut_contrat"]');
+        if (sel) {
+          for (let opt of sel.options) {
+            if (opt.value === 'Relancé') { opt.selected = true; break; }
+          }
+          row.dataset.statut = 'Relancé';
+        }
+        btn.closest('.relancer-cell').innerHTML = '<span class="muted">—</span>';
+        alert(data.message);
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Relancer';
+        alert('Erreur : ' + data.error);
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = 'Relancer';
+      alert('Erreur réseau.');
+    });
+}
+
+/* ── Supprimer ── */
+function supprimerEleve(event, id, btn) {
+  event.stopPropagation();
+  if (!confirm('Supprimer cet élève de la base Notion ? Cette action est irréversible.')) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  fetch(ELEVES_BASE + '/' + id, {method: 'DELETE'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        const row = btn.closest('tr');
+        row.style.transition = 'opacity .3s';
+        row.style.opacity = '0';
+        setTimeout(() => {
+          row.remove();
+          applyFilters();
+        }, 300);
+      } else {
+        btn.disabled = false;
+        btn.textContent = '✕';
+        alert('Erreur : ' + data.error);
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = '✕';
+      alert('Erreur réseau.');
+    });
+}
+</script>
+{% endblock %}

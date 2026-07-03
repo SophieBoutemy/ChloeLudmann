@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if eleve %}{{ eleve.nom or eleve.email }}{% else %}Élève{% endif %} — Mon Adjoint IA{% endblock %}
+
+{% block extra_head %}
+<style>
+
+/* ── Header de page ── */
+.page-top {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:1rem; flex-wrap:wrap; margin-bottom:1.75rem;
+}
+.page-top h1 {
+  font-size:1.5rem; font-weight:600; color:var(--green); margin:0;
+}
+.page-top-actions { display:flex; gap:.55rem; flex-wrap:wrap; align-items:center; }
+
+.btn-action {
+  padding:.38rem .85rem; border-radius:7px; font-size:.8125rem;
+  font-weight:500; font-family:inherit; cursor:pointer;
+  border:none; transition:background .15s; white-space:nowrap;
+}
+.btn-action-orange { background:var(--orange); color:#fff; }
+.btn-action-orange:hover { background:#c46c0a; }
+.btn-action-orange:disabled { opacity:.5; cursor:not-allowed; }
+.btn-action-outline {
+  background:transparent; color:var(--green);
+  border:1.5px solid var(--green);
+  text-decoration:none; display:inline-block;
+}
+.btn-action-outline:hover { background:#f0f4ee; }
+.btn-action-danger {
+  background:#fef2f2; color:#b91c1c;
+  border:1.5px solid #fecaca;
+}
+.btn-action-danger:hover { background:#fee2e2; }
+
+/* ── Cards ── */
+.card {
+  background:#fff; border-radius:8px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08); margin-bottom:1.25rem;
+}
+.card-header {
+  padding:.85rem 1.4rem; border-bottom:1px solid var(--border);
+}
+.card-header h2 {
+  font-size:.7rem; font-weight:700; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.09em; margin:0;
+}
+.card-body { padding:1.3rem 1.4rem; }
+
+/* ── Card 1 : Identité ── */
+.identity-email {
+  font-size:1.2rem; font-weight:600; color:var(--green);
+  word-break:break-all; margin-bottom:.55rem;
+}
+.identity-nom {
+  font-size:1rem; color:var(--text);
+}
+.identity-nom.empty { color:var(--muted); font-style:italic; }
+
+/* ── Card 2 : Informations en liste ── */
+.info-list { display:flex; flex-direction:column; }
+
+.info-item {
+  padding:.75rem 0;
+  border-bottom:1px solid #F0F0F0;
+}
+.info-item:first-child { padding-top:0; }
+.info-item:last-child  { padding-bottom:0; border-bottom:none; }
+
+.info-label {
+  font-size:.72rem; font-weight:600; color:#C66A00;
+  text-transform:uppercase; letter-spacing:.07em; margin-bottom:.2rem;
+}
+.info-value {
+  font-size:.9rem; color:#262525; line-height:1.55;
+  white-space:pre-wrap; word-break:break-word;
+}
+.info-value.empty { color:#cac8c5; font-style:normal; }
+
+.badge {
+  display:inline-block; padding:.18rem .6rem; border-radius:20px;
+  font-size:.8rem; font-weight:500;
+}
+.badge-signe   { background:#dcfce7; color:#166534; }
+.badge-attente { background:#fff0d9; color:#9a4500; }
+.badge-relance { background:#e0f2fe; color:#0369a1; }
+.badge-default { background:#f3f4f6; color:#6b7280; }
+
+.badge-type {
+  display:inline-block; padding:.13rem .5rem; border-radius:20px;
+  font-size:.78rem; background:#f0f4ee; color:var(--green); margin-right:.3rem;
+}
+
+/* ── Card 3 : Résumé ── */
+.resume-text {
+  font-size:.9rem; color:var(--text); line-height:1.65;
+  white-space:pre-wrap; word-break:break-word;
+}
+.resume-text.empty { color:var(--muted); font-style:italic; }
+
+/* ── Card 4 : Notes ── */
+.notes-textarea {
+  width:100%; min-height:180px; padding:.75rem 1rem;
+  border:1.5px solid var(--border); border-radius:8px;
+  font-size:.9rem; font-family:inherit; line-height:1.65;
+  color:var(--text); background:#fdfcfb; resize:vertical;
+  outline:none; box-sizing:border-box; transition:border-color .15s;
+}
+.notes-textarea:focus { border-color:var(--green); }
+.notes-save-row { display:flex; align-items:center; gap:.75rem; margin-top:.75rem; }
+.notes-status { font-size:.8rem; color:var(--muted); }
+.notes-status.ok  { color:#16a34a; }
+.notes-status.err { color:#b91c1c; }
+
+.alert-error {
+  background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;
+  border-radius:6px; padding:.75rem 1rem; margin-bottom:1.25rem; font-size:.875rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="alert-error">{{ error }}</div>
+{% elif eleve %}
+
+<div class="page-top">
+  <h1>{{ eleve.nom or eleve.email or 'Élève sans nom' }}</h1>
+  <div class="page-top-actions">
+    {% if eleve.statut_contrat == 'En attente' %}
+    <button id="btn-relancer" class="btn-action btn-action-orange" onclick="relancer()">Relancer le contrat</button>
+    {% endif %}
+    {% if eleve.notion_url %}
+    <a href="{{ eleve.notion_url }}" target="_blank" class="btn-action btn-action-outline">Ouvrir dans Notion ↗</a>
+    {% endif %}
+    <button class="btn-action btn-action-danger" onclick="supprimerEleve()">Supprimer</button>
+  </div>
+</div>
+
+{# ── CARD 1 : Identité ── #}
+<div class="card">
+  <div class="card-header"><h2>Identité</h2></div>
+  <div class="card-body">
+    <div class="identity-email">{{ eleve.email or '—' }}</div>
+    <div class="identity-nom {% if not eleve.nom %}empty{% endif %}">{{ eleve.nom or 'Nom non renseigné' }}</div>
+  </div>
+</div>
+
+{# ── CARD 2 : Informations ── #}
+<div class="card">
+  <div class="card-header"><h2>Informations</h2></div>
+  <div class="card-body" style="padding:20px;">
+    <div class="info-list">
+
+      <div class="info-item">
+        <div class="info-label">Type d'élève</div>
+        <div class="info-value">
+          {% if eleve.type_eleve %}
+            {% for t in eleve.type_eleve.split(',') %}<span class="badge-type">{{ t.strip() }}</span>{% endfor %}
+          {% else %}<span style="color:#cac8c5;">—</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Boîte mail</div>
+        <div class="info-value {% if not eleve.boite_mail %}empty{% endif %}">{{ eleve.boite_mail or '—' }}</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Statut contrat envoyé</div>
+        <div class="info-value">
+          {% if eleve.statut_contrat == 'Signé' %}<span class="badge badge-signe">Signé</span>
+          {% elif eleve.statut_contrat == 'Relancé' %}<span class="badge badge-relance">Relancé</span>
+          {% elif eleve.statut_contrat == 'En attente' %}<span class="badge badge-attente">En attente</span>
+          {% elif eleve.statut_contrat %}<span class="badge badge-default">{{ eleve.statut_contrat }}</span>
+          {% else %}<span style="color:#cac8c5;">—</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Rattrapage</div>
+        <div class="info-value {% if not eleve.rattrapage %}empty{% endif %}">{{ eleve.rattrapage or '—' }}</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Date du mail</div>
+        <div class="info-value {% if not eleve.date_mail %}empty{% endif %}">{{ eleve.date_mail or '—' }}</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Date newsletter envoyée</div>
+        <div class="info-value {% if not eleve.date_newsletter %}empty{% endif %}">{{ eleve.date_newsletter or '—' }}</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Date contrat envoyé</div>
+        <div class="info-value {% if not eleve.date_contrat %}empty{% endif %}">{{ eleve.date_contrat or '—' }}</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Date de relance</div>
+        <div class="info-value {% if not eleve.date_relance %}empty{% endif %}">{{ eleve.date_relance or '—' }}</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Infos</div>
+        <div class="info-value {% if not eleve.infos %}empty{% endif %}">{{ eleve.infos or '—' }}</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Infos Calendly</div>
+        <div class="info-value {% if not eleve.infos_calendly %}empty{% endif %}">{{ eleve.infos_calendly or '—' }}</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{# ── CARD 3 : Résumé des mails ── #}
+<div class="card">
+  <div class="card-header"><h2>Résumé des mails</h2></div>
+  <div class="card-body">
+    <div class="resume-text {% if not eleve.resume_mail %}empty{% endif %}">{{ eleve.resume_mail or 'Aucun résumé disponible.' }}</div>
+  </div>
+</div>
+
+{# ── CARD 4 : Notes libres ── #}
+<div class="card">
+  <div class="card-header"><h2>Notes libres</h2></div>
+  <div class="card-body">
+    <textarea class="notes-textarea" id="notes-textarea"
+              placeholder="Notes libres sur cet élève…">{{ eleve.notes }}</textarea>
+    <div class="notes-save-row">
+      <button class="btn-action btn-action-orange" onclick="saveNotes()">Enregistrer</button>
+      <span class="notes-status" id="notes-status"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const PAGE_ID     = "{{ eleve.id }}";
+const ELEVES_BASE = "{{ url_for('eleves') }}";
+
+function saveNotes() {
+  const content = document.getElementById('notes-textarea').value;
+  const status  = document.getElementById('notes-status');
+  status.textContent = 'Enregistrement…';
+  status.className   = 'notes-status';
+  fetch(ELEVES_BASE + '/' + PAGE_ID + '/notes', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({content}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      status.textContent = 'Enregistré ✓';
+      status.className   = 'notes-status ok';
+      setTimeout(() => { status.textContent = ''; }, 2500);
+    } else {
+      status.textContent = 'Erreur : ' + data.error;
+      status.className   = 'notes-status err';
+    }
+  })
+  .catch(() => { status.textContent = 'Erreur réseau.'; status.className = 'notes-status err'; });
+}
+
+document.getElementById('notes-textarea').addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveNotes(); }
+});
+
+function relancer() {
+  if (!confirm('Envoyer une relance pour cet élève ?')) return;
+  const btn = document.getElementById('btn-relancer');
+  btn.disabled = true; btn.textContent = 'Envoi…';
+  fetch(ELEVES_BASE + '/' + PAGE_ID + '/relancer', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) { alert(data.message); window.location.reload(); }
+      else { btn.disabled = false; btn.textContent = 'Relancer le contrat'; alert('Erreur : ' + data.error); }
+    })
+    .catch(() => { btn.disabled = false; btn.textContent = 'Relancer le contrat'; alert('Erreur réseau.'); });
+}
+
+function supprimerEleve() {
+  if (!confirm('Supprimer définitivement cet élève de la base Notion ?')) return;
+  fetch(ELEVES_BASE + '/' + PAGE_ID, {method: 'DELETE'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) { alert('Élève supprimé.'); window.location.href = ELEVES_BASE; }
+      else { alert('Erreur : ' + data.error); }
+    })
+    .catch(() => alert('Erreur réseau.'));
+}
+</script>
+
+{% endif %}
+{% endblock %}

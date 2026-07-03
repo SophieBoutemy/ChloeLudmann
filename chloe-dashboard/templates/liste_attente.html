@@ -1,0 +1,325 @@
+{% extends 'base.html' %}
+
+{% block title %}Liste d'attente — Mon Adjoint IA{% endblock %}
+
+{% block extra_head %}
+<style>
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  margin-bottom: 2rem;
+}
+.status-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%; flex-shrink: 0;
+}
+.dot-ok      { background: #4ade80; }
+.dot-warn    { background: #fbbf24; }
+.dot-stale   { background: #f87171; }
+.dot-unknown { background: #d1d5db; }
+.status-label { font-size: .875rem; color: var(--muted); }
+.status-label strong { color: var(--text); font-weight: 600; }
+
+.count-badge {
+  display: inline-block; background: var(--green); color: #fff;
+  font-size: .7rem; font-weight: 600; padding: .15rem .55rem;
+  border-radius: 20px; margin-left: .4rem; vertical-align: middle;
+}
+.count-badge-empty { background: var(--muted); }
+
+.la-grid { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.la-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+.la-card-header {
+  padding: .85rem 1.25rem;
+  border-bottom: 1px solid #f0ece8;
+  font-size: .9375rem;
+  font-weight: 600;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+.la-card-header-title { display: flex; align-items: center; gap: 0; }
+
+/* Date filter */
+.hist-filters {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+.hist-label {
+  font-size: .75rem;
+  color: var(--muted);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.hist-date-input {
+  padding: .2rem .45rem;
+  border: 1.5px solid var(--border);
+  border-radius: 5px;
+  font-size: .75rem;
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+  outline: none;
+  height: 28px;
+  cursor: pointer;
+}
+.hist-date-input:focus { border-color: var(--green); }
+.hist-btn-all {
+  padding: .2rem .6rem;
+  border: 1.5px solid var(--green);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--green);
+  font-size: .75rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  height: 28px;
+  transition: background .12s;
+}
+.hist-btn-all:hover { background: #f0f4ee; }
+
+/* Waitlist table */
+.wl-table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+.wl-table thead th {
+  background: var(--green); color: #fff; font-weight: 500;
+  padding: .55rem .9rem; text-align: left;
+}
+.wl-table tbody tr { border-bottom: 1px solid #f0ece8; }
+.wl-table tbody tr:last-child { border-bottom: none; }
+.wl-table tbody tr:hover { background: #faf8f6; }
+.wl-table td { padding: .5rem .9rem; color: var(--text); }
+.td-name  { font-weight: 500; }
+.td-email { color: var(--muted); font-size: .775rem; }
+
+.empty-state {
+  text-align: center; padding: 2.5rem 1rem;
+  color: var(--muted); font-size: .875rem;
+}
+.empty-icon { font-size: 1.5rem; margin-bottom: .5rem; }
+
+/* Event groups */
+.events-list {
+  padding: .75rem 1rem;
+  max-height: 460px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+
+.ev-group { border-radius: 6px; }
+.ev-group:hover { background: #fafaf8; }
+
+.ev-row {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .45rem .5rem;
+  font-size: .8rem;
+}
+
+.ev-ts {
+  flex-shrink: 0;
+  width: 160px;
+  color: var(--muted);
+  font-size: .75rem;
+  white-space: nowrap;
+}
+
+.ev-badge {
+  flex-shrink: 0;
+  font-size: .68rem;
+  font-weight: 600;
+  padding: .15rem .5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  min-width: 120px;
+  text-align: center;
+}
+.badge-inscription  { background: #dcfce7; color: #166534; }
+.badge-erreur       { background: #fee2e2; color: #991b1b; }
+.badge-annulation   { background: #fff0d9; color: #9a4500; }
+
+.ev-person { font-weight: 500; color: var(--text); flex-shrink: 0; }
+.ev-email  { color: var(--muted); font-size: .775rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-info   { color: var(--muted); font-size: .8rem; }
+.ev-sep    { flex-shrink: 0; color: #ccc; font-size: .7rem; }
+
+.ev-notifies {
+  padding: .1rem .5rem .4rem calc(.5rem + 160px + .65rem + 120px + .65rem);
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+.ev-notify {
+  font-size: .775rem;
+  color: var(--muted);
+  display: flex;
+  gap: .4rem;
+}
+.ev-notify-arrow { flex-shrink: 0; color: #ccc; }
+.ev-notify-name  { color: var(--text); font-weight: 500; flex-shrink: 0; }
+.ev-notify-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.log-empty {
+  padding: 2rem 1.25rem;
+  color: var(--muted);
+  font-size: .875rem;
+  text-align: center;
+}
+
+#ev-none-msg {
+  display: none;
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--muted);
+  font-size: .875rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <h1>Liste d'attente</h1>
+  </div>
+</div>
+
+<div class="status-row">
+  <span class="status-dot dot-{{ service_status.status }}"></span>
+  <span class="status-label">Service <strong>liste-attente.service</strong> — {{ service_status.label }}</span>
+</div>
+
+<div class="la-grid">
+
+  <!-- Inscrits actuels -->
+  <div class="la-card">
+    <div class="la-card-header">
+      <span class="la-card-header-title">
+        Inscrits actuels
+        <span class="count-badge {% if not waitlist %}count-badge-empty{% endif %}">{{ waitlist|length }}</span>
+      </span>
+    </div>
+    {% if waitlist %}
+    <table class="wl-table">
+      <thead>
+        <tr><th>Nom</th><th>Email</th></tr>
+      </thead>
+      <tbody>
+        {% for person in waitlist %}
+        <tr>
+          <td class="td-name">{{ person.name or '—' }}</td>
+          <td class="td-email">{{ person.email or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">✓</div>
+      Liste vide — aucun inscrit en attente
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Historique -->
+  <div class="la-card">
+    <div class="la-card-header">
+      <span class="la-card-header-title">
+        Historique
+        <span class="count-badge count-badge-empty" id="ev-count">0</span>
+      </span>
+      <div class="hist-filters">
+        <span class="hist-label">Depuis</span>
+        <input type="date" id="f-hist-date" class="hist-date-input" onchange="applyHistFilter()">
+        <button class="hist-btn-all" onclick="showAllHist()">Tout afficher</button>
+      </div>
+    </div>
+    {% if log_events %}
+    <div class="events-list" id="events-list">
+      <div id="ev-none-msg">Aucun événement sur cette période.</div>
+      {% for ev in log_events %}
+      <div class="ev-group" data-ts="{{ ev.ts_iso }}">
+
+        {% if ev.type == 'inscription' %}
+        <div class="ev-row">
+          <span class="ev-ts">{{ ev.ts or '—' }}</span>
+          <span class="ev-badge {% if ev.has_error %}badge-erreur{% else %}badge-inscription{% endif %}">
+            {% if ev.has_error %}Inscription ⚠{% else %}Inscription{% endif %}
+          </span>
+          {% if ev.nom %}<span class="ev-person">{{ ev.nom }}</span>{% endif %}
+          {% if ev.nom and ev.email %}<span class="ev-sep">·</span>{% endif %}
+          {% if ev.email %}<span class="ev-email">{{ ev.email }}</span>{% endif %}
+        </div>
+
+        {% elif ev.type == 'annulation' %}
+        <div class="ev-row">
+          <span class="ev-ts">{{ ev.ts or '—' }}</span>
+          <span class="ev-badge badge-annulation">Annulation Calendly</span>
+          <span class="ev-info">{{ ev.count }} inscrit{{ 's' if ev.count > 1 else '' }} notifié{{ 's' if ev.count > 1 else '' }}</span>
+        </div>
+        {% if ev.notifies %}
+        <div class="ev-notifies">
+          {% for n in ev.notifies %}
+          <div class="ev-notify">
+            <span class="ev-notify-arrow">↳</span>
+            {% if n.nom %}<span class="ev-notify-name">{{ n.nom }}</span>{% endif %}
+            {% if n.nom and n.email %}<span class="ev-sep">·</span>{% endif %}
+            {% if n.email %}<span class="ev-notify-email">{{ n.email }}</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="log-empty">Aucun événement enregistré dans le log.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+function applyHistFilter() {
+  const since = document.getElementById('f-hist-date').value; // YYYY-MM-DD or ''
+  let visible = 0;
+  document.querySelectorAll('#events-list .ev-group[data-ts]').forEach(function(g) {
+    const ts = g.dataset.ts;
+    const show = !since || !ts || ts >= since;
+    g.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  const badge = document.getElementById('ev-count');
+  if (badge) badge.textContent = visible;
+  const noneMsg = document.getElementById('ev-none-msg');
+  if (noneMsg) noneMsg.style.display = visible === 0 ? 'block' : 'none';
+}
+
+function showAllHist() {
+  document.getElementById('f-hist-date').value = '';
+  applyHistFilter();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const d = new Date();
+  d.setDate(d.getDate() - 180);
+  document.getElementById('f-hist-date').value = d.toISOString().slice(0, 10);
+  applyHistFilter();
+});
+</script>
+{% endblock %}

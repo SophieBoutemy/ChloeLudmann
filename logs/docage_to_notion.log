@@ -1,0 +1,273 @@
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 359, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 260, in sync
+    clients_by_email  = notion.load_all_clients()    # {email_lower: page}
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 162, in load_all_clients
+    res = self.query_db(NOTION_CLIENTS_DB, cursor=cursor)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 155, in query_db
+    return self._post(f"/databases/{db_id}/query", body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 141, in _post
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 404 Client Error: Not Found for url: https://api.notion.com/v1/databases/345afa74cfc9802ba2b9ecfc5c197996/query
+2026-05-29 08:00:05,600 INFO Notion: 90 événements chargés (86 élèves)
+2026-05-29 08:00:05,962 INFO 1 box(es) found in Docage
+2026-05-29 08:00:06,376 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-01 08:00:09,524 INFO Notion: 287 événements chargés (287 élèves)
+2026-06-01 08:00:09,937 INFO 1 box(es) found in Docage
+2026-06-01 08:00:10,375 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-03 08:00:08,824 INFO Notion: 288 événements chargés (288 élèves)
+2026-06-03 08:00:09,238 INFO 1 box(es) found in Docage
+2026-06-03 08:00:09,635 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-05 08:00:12,360 INFO Notion: 290 événements chargés (290 élèves)
+2026-06-05 08:00:12,693 INFO 1 box(es) found in Docage
+2026-06-05 08:00:13,175 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-08 08:00:08,639 INFO Notion: 291 événements chargés (291 élèves)
+2026-06-08 08:00:09,018 INFO 1 box(es) found in Docage
+2026-06-08 08:00:09,485 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-10 08:00:08,865 INFO Notion: 292 événements chargés (292 élèves)
+2026-06-10 08:00:09,231 INFO 1 box(es) found in Docage
+2026-06-10 08:00:09,841 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-12 08:00:08,099 INFO Notion: 294 événements chargés (294 élèves)
+2026-06-12 08:00:08,447 INFO 1 box(es) found in Docage
+2026-06-12 08:00:08,901 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-15 08:00:05,435 INFO Notion: 294 événements chargés (294 élèves)
+2026-06-15 08:00:05,887 INFO 1 box(es) found in Docage
+2026-06-15 08:00:06,357 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-17 08:00:05,119 INFO Notion: 297 événements chargés (297 élèves)
+2026-06-17 08:00:05,555 INFO 1 box(es) found in Docage
+2026-06-17 08:00:06,034 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-19 08:00:08,870 INFO Notion: 297 événements chargés (297 élèves)
+2026-06-19 08:00:09,305 INFO 1 box(es) found in Docage
+2026-06-19 08:00:09,738 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-22 08:00:13,297 INFO Notion: 297 événements chargés (297 élèves)
+2026-06-22 08:00:13,704 INFO 1 box(es) found in Docage
+2026-06-22 08:00:14,160 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-24 08:00:05,109 INFO Notion: 300 événements chargés (300 élèves)
+2026-06-24 08:00:05,652 INFO 1 box(es) found in Docage
+2026-06-24 08:00:06,198 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-26 08:00:04,453 INFO Notion: 300 événements chargés (300 élèves)
+2026-06-26 08:00:04,814 INFO 1 box(es) found in Docage
+2026-06-26 08:00:05,528 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-06-29 08:00:05,322 INFO Notion: 300 événements chargés (300 élèves)
+2026-06-29 08:00:05,761 INFO 1 box(es) found in Docage
+2026-06-29 08:00:06,195 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-07-01 08:00:07,708 INFO Notion: 301 événements chargés (301 élèves)
+2026-07-01 08:00:08,150 INFO 1 box(es) found in Docage
+2026-07-01 08:00:08,565 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
+2026-07-03 08:00:05,246 INFO Notion: 302 événements chargés (302 élèves)
+2026-07-03 08:00:05,605 INFO 1 box(es) found in Docage
+2026-07-03 08:00:06,052 INFO Box 'Cours de chant et de coaching vocal 2026' — 42 entries
+Traceback (most recent call last):
+  File "/home/ubuntu/automations/docage_to_notion.py", line 318, in <module>
+    sync(resend_unsigned=resend)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 284, in sync
+    notion.update_event(to_keep["id"], props)
+  File "/home/ubuntu/automations/docage_to_notion.py", line 185, in update_event
+    return self._patch(f"/pages/{page_id}", {"properties": props})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/automations/docage_to_notion.py", line 145, in _patch
+    r.raise_for_status()
+  File "/home/ubuntu/automations/venv/lib/python3.12/site-packages/requests/models.py", line 1028, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.notion.com/v1/pages/36cafa74-cfc9-81fc-aa35-d50365c6e006
