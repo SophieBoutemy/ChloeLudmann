@@ -60,11 +60,32 @@ sudo journalctl -u <service> -n 50
 
 ## GitHub
 
-- **Repo Chloé** : `https://github.com/lapetitefabriquedigitale/ChloeLudmann.git`
-- **Repo Sophie** : `https://github.com/lapetitefabriquedigitale/MonEspacePro.git`
-- **Branche** : `main` (les deux)
-- **Remotes** : configurés avec token HTTPS dans l'URL (remote git local)
-- **Backup auto** : commit hebdomadaire via cron (dimanche 21h, `backup_complet.sh`)
+**⚠️ Ancien compte `lapetitefabriquedigitale`** : le token utilisé pour ce compte a été **compromis (exposé en clair dans une sortie de commande) et révoqué**. Ne plus jamais l'utiliser ni tenter de le régénérer sur ce compte pour de nouvelles opérations.
+
+Repos historiques encore actifs sous ce compte (non migrés) :
+- **ChloeLudmann** — `https://github.com/lapetitefabriquedigitale/ChloeLudmann.git` — dans `~/automations`, **toujours utilisé par le cron `backup_complet.sh` (dimanche 21h)**. Ne pas repointer ce remote sans validation explicite, ce cron est en production.
+- **MonEspacePro** — `https://github.com/lapetitefabriquedigitale/MonEspacePro.git` — dans `~/sophie-dashboard`.
+
+**Nouveau compte GitHub : `SophieBoutemy`**
+- Authentification via `credential.helper store` : token stocké dans `~/.git-credentials` (permissions `600`), **jamais** embarqué en clair dans une URL de remote (`git remote -v` reste toujours propre).
+- Repos actifs :
+  - **monadjointia** — `https://github.com/SophieBoutemy/monadjointia.git` — `/var/www/mon-adjoint-ia`
+  - **lpfd** — `https://github.com/SophieBoutemy/lpfd.git` — `~/sites-statiques/lapetitefabriquedigitale`
+  - **chloeludmann** — créé sur `SophieBoutemy` mais **pas encore peuplé** — la séparation de `~/automations` est en cours (voir section "Séparation ~/automations" ci-dessous), ce repo recevra `~/chloe-automations` une fois la validation faite.
+- **Branche** : `master` (nouveaux repos) — à distinguer de `main` utilisé par les anciens repos `lapetitefabriquedigitale`.
+
+---
+
+## Séparation `~/automations` (en cours, pas encore finalisée)
+
+`~/automations` contient historiquement le code de Chloé Ludmann **et** quelques traces de Mon Adjoint IA (Sophie) mélangées (2 fichiers de logs). Une séparation par **copie non destructive** est en cours :
+
+- **`~/automations`** — reste la source active et de référence. **Non touché**, le cron `backup_complet.sh` (dimanche 21h) continue de tourner dessus normalement pendant toute l'opération.
+- **`~/chloe-automations/`** — copie en cours de constitution, contiendra à terme tout ce qui est spécifique à Chloé Ludmann : `chloe-dashboard/`, `factures/`, `liste_attente/`, `recurrence_calendly/`, `export_excel/`, scripts Gmail/Notion (`imap_to_notion_chloe.py`, `daily_summary.py`, `docage_to_notion.py`, etc.), tests/diagnostics associés (`test_*.py`, `_diag_*.py`, `debug_*.py`). Un `.env` spécifique a été extrait (voir ci-dessous). Pas encore poussé vers le repo GitHub `chloeludmann`.
+- **`~/autres-clients/`** — `import_notion_btp.py` (client BTP ponctuel, sans lien avec Chloé ni Mon Adjoint IA).
+- **`~/a-trancher/`** — `_diag_sophie.py`, contenu non lu en détail, classement à clarifier avant de le ranger définitivement.
+- **`dashboard.log`** et **`purge_anciens_sophie.log`** restent dans `~/automations/logs/` — liés à Mon Adjoint IA (Sophie), mais aucun dossier dédié type `~/sophie-automations` n'a encore été créé pour les accueillir.
+- **`.env`** — reste partagé entre les deux projets dans `~/automations/.env`, pas dupliqué tel quel. Un `.env` filtré, contenant uniquement les clés effectivement utilisées par les scripts Chloé, a été créé dans `~/chloe-automations/.env` (permissions `600`).
 
 ---
 
