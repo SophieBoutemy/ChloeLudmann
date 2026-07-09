@@ -1,3 +1,17 @@
+# Règles permanentes — efficacité des commandes
+
+Avant d'exécuter une commande shell/SSH/Python :
+1. **Regrouper** : combiner plusieurs actions en un seul aller-retour si possible.
+2. **Patch ciblé** : utiliser `str_replace` / `Edit` sur la section concernée plutôt que de réécrire un fichier entier.
+3. **Justifier les tests exploratoires** : si la commande sert à "voir si ça marche", le dire en une ligne avant de la lancer.
+4. **Erreur d'échappement shell** : ne pas réessayer plusieurs variantes — écrire un script `.py` temporaire sur le serveur et l'exécuter une fois.
+5. **Sync avant modification** : avant toute session de travail sur un projet déployé sur le VPS (`automations/`, `sophie-dashboard/`, `sites-statiques/*`), faire `git fetch && git status --branch` pour vérifier que la copie locale/serveur est à jour avec `origin`. En cas de divergence (commits en avance/retard, ou modifications non commitées inattendues), s'arrêter et le signaler à l'utilisateur avant de continuer — ne jamais modifier un fichier dont l'état de synchronisation est incertain. (Root cause du 2026-07-08 : un agent a réécrit `chloe-dashboard/app.py` en entier depuis une copie locale obsolète sans vérifier l'état git au préalable, écrasant ~900 lignes de fonctionnalités récentes.)
+6. **Restart de service = `deploy_check.sh`, jamais `systemctl restart` direct** : pour redémarrer un service Flask sur le VPS, toujours utiliser `~/automations/scripts/deploy_check.sh <service_name>` (jamais `sudo systemctl restart <service>` directement, sauf urgence explicitement assumée). Le script vérifie la syntaxe Python du fichier principal, détecte une perte de code anormale (>20% de lignes en moins vs le dernier commit git), signale les fichiers non commités, fait un health check HTTP post-restart, et rollback automatiquement (`git checkout HEAD -- <dossier du service>`) + alerte email en cas d'échec. Services connus : `chloe-dashboard`, `factures-app`, `liste-attente`, `recurrence-calendly`, `export-eleves`, `sophie-dashboard`.
+
+Objectif : minimiser le nombre de commandes et le volume de tokens par session, sans sacrifier la correction.
+
+---
+
 # Infrastructure VPS — Automations Sophie Boutemy
 
 VPS OVH partagé entre deux projets : les automatisations de **Chloé Ludmann** et le **dashboard personnel Sophie**. Tout tourne sur le même serveur, avec des services systemd distincts par module.
@@ -37,7 +51,7 @@ Nginx configs : `/etc/nginx/sites-enabled/`
 Commandes utiles :
 ```bash
 sudo systemctl status <service>
-sudo systemctl restart <service>
+~/automations/scripts/deploy_check.sh <service>   # restart avec garde-fous — voir règle 6 ci-dessus, ne pas utiliser systemctl restart directement
 sudo journalctl -u <service> -n 50
 ```
 
@@ -55,37 +69,43 @@ sudo journalctl -u <service> -n 50
 | `recurrence_calendly/retry.py` | Tous les jours à 7h | Relance les créneaux Calendly en attente |
 | `weekly_backup.py` | Dimanches à 20h | Export JSON base Notion élèves |
 | `backup_complet.sh` | Dimanches à 21h | Backup complet VPS |
+| `purge_rgpd.py` | 1er du mois à 3h | Purge RGPD automatique (non documenté dans chloe-dashboard) |
+
+---
+
+## Backup complet (`backup_complet.sh`)
+
+**Script** : `/home/ubuntu/backups/backup_complet.sh` (PAS dans `automations/`)
+**Log** : `/home/ubuntu/automations/logs/backup_complet.log`
+
+Exécution en 5 étapes chaque dimanche à 21h :
+
+1. **Archive code** → `~/backups/code-DATE.tar.gz`
+   - Contenu : `~/automations/` + `~/sophie-dashboard/`
+   - Exclusions : `venv/`, `__pycache__/`, `.git/`, `backups/`, `logs/`, `waitlist.json`, `processed_emails.json`
+
+2. **Archive secrets chiffrée** → `~/backups/secrets-DATE.tar.gz.gpg`
+   - Contenu : `.env`, `credentials.json`, `token.json`, `factures/service_account.json`
+   - Chiffrement : GPG AES256, passphrase dans `~/.gpg_backup_passphrase`
+
+3. **Push git** : `git add -A && git commit -m "auto: backup DATE" && git push` sur les deux repos (automations + sophie-dashboard)
+
+4. **Upload Google Drive** : `rclone copy` vers remote `gdrive-perso` → `Backups VPS/code/` et `Backups VPS/secrets/`
+
+5. **Nettoyage local** : archives (code + secrets + `sophie-dashboard-*.tar.gz`) de plus de 30 jours supprimées. Drive conservé indéfiniment.
 
 ---
 
 ## GitHub
 
-**⚠️ Ancien compte `lapetitefabriquedigitale`** : le token utilisé pour ce compte a été **compromis (exposé en clair dans une sortie de commande) et révoqué**. Ne plus jamais l'utiliser ni tenter de le régénérer sur ce compte pour de nouvelles opérations.
+**Compte actif : `SophieBoutemy`** (migration terminée le 2026-07-09, suite à un ancien token `lapetitefabriquedigitale` compromis — exposé en clair dans une sortie de commande — et révoqué).
 
-Repos historiques encore actifs sous ce compte (non migrés) :
-- **ChloeLudmann** — `https://github.com/lapetitefabriquedigitale/ChloeLudmann.git` — dans `~/automations`, **toujours utilisé par le cron `backup_complet.sh` (dimanche 21h)**. Ne pas repointer ce remote sans validation explicite, ce cron est en production.
-- **MonEspacePro** — `https://github.com/lapetitefabriquedigitale/MonEspacePro.git` — dans `~/sophie-dashboard`.
-
-**Nouveau compte GitHub : `SophieBoutemy`**
-- Authentification via `credential.helper store` : token stocké dans `~/.git-credentials` (permissions `600`), **jamais** embarqué en clair dans une URL de remote (`git remote -v` reste toujours propre).
-- Repos actifs :
-  - **monadjointia** — `https://github.com/SophieBoutemy/monadjointia.git` — `/var/www/mon-adjoint-ia`
-  - **lpfd** — `https://github.com/SophieBoutemy/lpfd.git` — `~/sites-statiques/lapetitefabriquedigitale`
-  - **chloeludmann** — créé sur `SophieBoutemy` mais **pas encore peuplé** — la séparation de `~/automations` est en cours (voir section "Séparation ~/automations" ci-dessous), ce repo recevra `~/chloe-automations` une fois la validation faite.
-- **Branche** : `master` (nouveaux repos) — à distinguer de `main` utilisé par les anciens repos `lapetitefabriquedigitale`.
-
----
-
-## Séparation `~/automations` (en cours, pas encore finalisée)
-
-`~/automations` contient historiquement le code de Chloé Ludmann **et** quelques traces de Mon Adjoint IA (Sophie) mélangées (2 fichiers de logs). Une séparation par **copie non destructive** est en cours :
-
-- **`~/automations`** — reste la source active et de référence. **Non touché**, le cron `backup_complet.sh` (dimanche 21h) continue de tourner dessus normalement pendant toute l'opération.
-- **`~/chloe-automations/`** — copie en cours de constitution, contiendra à terme tout ce qui est spécifique à Chloé Ludmann : `chloe-dashboard/`, `factures/`, `liste_attente/`, `recurrence_calendly/`, `export_excel/`, scripts Gmail/Notion (`imap_to_notion_chloe.py`, `daily_summary.py`, `docage_to_notion.py`, etc.), tests/diagnostics associés (`test_*.py`, `_diag_*.py`, `debug_*.py`). Un `.env` spécifique a été extrait (voir ci-dessous). Pas encore poussé vers le repo GitHub `chloeludmann`.
-- **`~/autres-clients/`** — `import_notion_btp.py` (client BTP ponctuel, sans lien avec Chloé ni Mon Adjoint IA).
-- **`~/a-trancher/`** — `_diag_sophie.py`, contenu non lu en détail, classement à clarifier avant de le ranger définitivement.
-- **`dashboard.log`** et **`purge_anciens_sophie.log`** restent dans `~/automations/logs/` — liés à Mon Adjoint IA (Sophie), mais aucun dossier dédié type `~/sophie-automations` n'a encore été créé pour les accueillir.
-- **`.env`** — reste partagé entre les deux projets dans `~/automations/.env`, pas dupliqué tel quel. Un `.env` filtré, contenant uniquement les clés effectivement utilisées par les scripts Chloé, a été créé dans `~/chloe-automations/.env` (permissions `600`).
+- **Repo Chloé** : `https://github.com/SophieBoutemy/ChloeLudmann.git` — dans `~/automations`, branche `main`.
+- **Repo Sophie** : `https://github.com/SophieBoutemy/MonEspacePro.git` — dans `~/sophie-dashboard`, branche `main`.
+- **Repo sophieboutemy.fr** : `https://github.com/SophieBoutemy/sophieboutemy.git` — dans `~/sites-statiques/sophieboutemy`, branche `master`.
+- **Authentification** : `credential.helper store` global, token stocké dans `~/.git-credentials` (permissions `600`). **Jamais** de token en clair dans une URL de remote — `git remote -v` doit toujours rester propre sur les 3 repos.
+- **Backup auto** : commit hebdomadaire via cron (dimanche 21h, `backup_complet.sh`), cible `~/automations` (et non plus `~/chloe-automations`, copie de migration abandonnée le 2026-07-09 et renommée `~/chloe-automations.bak-20260709`).
+- **`SophieBoutemy/monadjointia`** et **`SophieBoutemy/lpfd`** sont des repos distincts (sites statiques `mon-adjoint-ia.fr` et `lapetitefabriquedigitale.fr`), sans rapport avec `sophie-dashboard` — ne pas confondre.
 
 ---
 
@@ -124,9 +144,9 @@ Fichier : `/home/ubuntu/automations/.env`. Ne jamais committer les valeurs.
 | `DASHBOARD_PASSWORD` | Mot de passe admin dashboard Chloé |
 | `DASHBOARD_SECRET_KEY` | Clé secrète Flask (chloe-dashboard) |
 | `DASHBOARD_USER_EMAIL` | Email admin dashboard Chloé |
-| `SOPHIE_DASHBOARD_USER` | Login admin Mon Espace Pro |
-| `SOPHIE_DASHBOARD_PASSWORD` | Mot de passe admin Mon Espace Pro |
-| `SOPHIE_DASHBOARD_EMAIL` | Email admin Mon Espace Pro |
+| `SOPHIE_DASHBOARD_USER` | Login admin Mon Adjoint IA |
+| `SOPHIE_DASHBOARD_PASSWORD` | Mot de passe admin Mon Adjoint IA |
+| `SOPHIE_DASHBOARD_EMAIL` | Email admin Mon Adjoint IA |
 | `SOPHIE_DASHBOARD_SECRET_KEY` | Clé secrète Flask (sophie-dashboard) |
 | `VPS_URL` | URL publique du VPS |
 
@@ -138,6 +158,70 @@ Fichier : `/home/ubuntu/automations/.env`. Ne jamais committer les valeurs.
 
 Dashboard : `https://automations.chloeludmann.fr/dashboard/`
 Répertoire : `/home/ubuntu/automations/`
+
+---
+
+## Dashboard Chloé — Interface Flask
+
+**Service** : `chloe-dashboard.service` — port 5005
+**Fichier principal** : `automations/chloe-dashboard/app.py`
+**Middleware** : `ProxyFix(x_proto=1, x_prefix=1)` — nécessaire car Nginx sert sous le préfixe `/dashboard/`
+
+### Authentification
+
+- Login : comparaison directe `DASHBOARD_USER` / `DASHBOARD_PASSWORD` (variables .env), session Flask
+- **Reset mot de passe** : token signé `itsdangerous` (sel `password-reset`, durée 1h) → email envoyé à `DASHBOARD_USER_EMAIL` via OVH SMTP SSL port 465 (`IMAP_EMAIL` / `IMAP_PASSWORD`) → mise à jour immédiate en mémoire + réécriture dans `.env` via `set_key`
+- Routes : `GET/POST /login`, `GET /logout`, `GET/POST /forgot-password`, `GET/POST /reset-password/<token>`
+
+### Données du tableau de bord — `automations.json`
+
+Source de vérité pour les statuts affichés sur la page d'accueil. Chaque entrée :
+
+| Champ | Usage |
+|---|---|
+| `agent` | Clé de regroupement (ex. `"Suivi Élèves"`, `"Factures"`) — correspond à `agent_key` dans `_AGENT_CARDS` |
+| `trigger` | `"cron"` → vérifie le log ; `"systemd"` → vérifie le service |
+| `log` + `stale_after_hours` | Chemin du log et seuil de fraîcheur (dot orange si dépassé) |
+| `service` | Nom du service systemd à vérifier |
+| `agent: "_hidden"` | Entrée interne non affichée dans le dashboard |
+
+### Structure `_AGENT_CARDS`
+
+Liste ordonnée des cards affichées sur la page d'accueil. Chaque card :
+- `title` : nom affiché (ex. `"Adjoint Client"`)
+- `agent_key` : filtre dans `automations.json` pour récupérer les scénarios et leurs statuts (vide `""` = pas de statuts temps réel)
+- `btn_label` / `btn_endpoint` : bouton d'accès au module (`url_for(btn_endpoint)`)
+- `description` : texte affiché si `agent_key` est vide
+
+Cards actuelles (dans l'ordre) : Adjoint Client, Adjoint Factures, Adjoint Attente, Adjoint Social, Adjoint Planning, Adjoint Prospection.
+
+### Routes principales
+
+| Méthode | Route | Auth | Description |
+|---|---|---|---|
+| GET/POST | `/login` | non | Login |
+| GET | `/logout` | non | Déconnexion |
+| GET/POST | `/forgot-password` | non | Demande reset MDP |
+| GET/POST | `/reset-password/<token>` | non | Réinitialisation MDP (token 1h) |
+| GET | `/` | oui | Tableau de bord principal |
+| GET | `/eleves` | oui | Liste des élèves (Notion) |
+| GET | `/factures` | oui | Liste des factures |
+| GET | `/liste-attente` | oui | Liste d'attente |
+| GET | `/brief-to-post` | oui | Adjoint Social (brief → contenu IA) |
+| GET/POST | `/rgpd` | oui | Purge RGPD (voir ci-dessous) |
+| GET | `/prospection` | oui | Module Adjoint Prospection |
+
+### Route RGPD — droit à l'effacement (`/rgpd`)
+
+**Accès** : `@login_required` — réservé à l'opérateur (Chloé ou Sophie)
+
+**Fonctionnement** :
+1. Formulaire GET : saisie d'un email + champ confirmation = `"EFFACER"` (validation obligatoire)
+2. POST : si les deux champs sont valides, `_rgpd_purge_email(email)` :
+   - Supprime toutes les entrées correspondantes dans `pending.db` (base SQLite Adjoint Planning)
+   - Purge les lignes contenant l'email dans `logs/recurrence_calendly.log` et `logs/recurrence_retry.log`
+   - **Ne purge pas** : Notion (manuel), logs IMAP/résumés (non dans le périmètre)
+3. `_rgpd_audit_log()` enregistre l'opération dans `logs/purge_rgpd.log` (IP opérateur, email, nombre de lignes supprimées)
 
 ---
 
@@ -162,6 +246,23 @@ Répertoire : `/home/ubuntu/automations/`
 | Fiche individuelle client | cron | Tous les jours à 19h30 | `imap_to_notion_chloe.py` |
 
 **Logs** : `logs/imap_to_notion_chloe.log`, `logs/docage_to_notion.log`, `logs/daily_summary.log`, `logs/weekly_backup.log`
+
+---
+
+## Export Élèves (`export-eleves.service`)
+
+**Ce qu'il fait** : exporte en temps réel la base Notion Élèves (`35eafa74`) en fichier Excel téléchargeable. Accessible directement depuis le dashboard Chloé (bouton "Export Excel").
+
+**Service** : `export-eleves.service` — port 5003, permanent
+**Fichier** : `automations/export_excel/app.py`
+
+**Endpoint** : `GET /export-eleves` — sans authentification, retourne directement `eleves.xlsx`
+
+**Fonctionnement** :
+- Récupère toutes les pages de la base Notion (pagination 100/requête)
+- Génère un fichier Excel via openpyxl : en-tête bleu (`2F5496`), police blanche gras, première ligne figée, largeur colonnes fixée à 20
+- Colonne `Relancer` exclue (`SKIP_COLUMNS`)
+- Téléchargement direct (`Content-Disposition: attachment`)
 
 ---
 
@@ -224,6 +325,39 @@ Répertoire : `/home/ubuntu/automations/`
 **État** : module non encore déployé (bouton désactivé dans le dashboard). Route `/brief_to_post` prévue.
 
 **Outils prévus** : Claude AI (génération de contenu)
+
+---
+
+## Adjoint Prospection (Chloé)
+
+**Ce qu'il fait** : même module que Sophie — recherche France/Suisse/Belgique, enrichissement, base contacts SQLite, envoi emails. Déployé dans `chloe-dashboard` (port 5005, même service que le dashboard principal).
+
+**Dashboard** : `automations.chloeludmann.fr/dashboard/` — card "Adjoint Prospection" (bouton "Ouvrir la prospection")
+
+**Base SQLite** : `chloe-dashboard/prospection/contacts.db` — **séparée** de celle de Sophie (`sophie-dashboard/prospection/contacts.db`). Les deux bases sont indépendantes, aucune donnée n'est partagée.
+
+**Coexistence avec la purge RGPD** : la route `POST /rgpd` dans `chloe-dashboard/app.py` est la purge des données élèves (voir section "Dashboard Chloé — Route RGPD"). Elle coexiste dans le même `app.py` que les routes Adjoint Prospection. La page d'information confidentialité est à `/politique-confidentialite` (et non `/rgpd` comme chez Sophie).
+
+**Fichiers clés** : `chloe-dashboard/prospection/` — identiques à sophie-dashboard (scraper.py, scraper_ch.py, scraper_be.py, runner.py, enricher.py, storage.py)
+
+**Routes** (mêmes URLs que Sophie, même comportement) :
+
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/prospection` | Page principale — stats, tâche en cours, formulaire (3 onglets pays) |
+| POST | `/prospection/run` | Lance une recherche (`country=FR/CH/BE`, codes NAF ou mots-clés) |
+| GET | `/prospection/status` | JSON — état de la tâche en cours (polling toutes les 2s) |
+| GET | `/prospection/contacts` | Liste des contacts filtrée et paginée (50/page) |
+| GET | `/prospection/contacts/export.csv` | Export CSV |
+| GET | `/prospection/contacts/export.xlsx` | Export Excel |
+| POST | `/prospection/contacts/delete` | Suppression par IDs |
+| PATCH | `/prospection/contacts/<id>` | Mise à jour inline (statut, notes) |
+| GET | `/prospection/today` | Contacts ajoutés aujourd'hui |
+| GET | `/prospection/priorite` | 15 contacts prioritaires |
+| GET | `/prospection/funnel` | Entonnoir de conversion par statut |
+| GET/POST | `/prospection/profile` | Profil expéditeur — SMTP, signature, limite quotidienne |
+| GET/POST | `/contact` | Formulaire de contact (footer) |
+| GET | `/politique-confidentialite` | Page RGPD & Confidentialité (≠ Sophie où c'est `/rgpd`) |
 
 ---
 
@@ -301,41 +435,105 @@ Répertoire : `/home/ubuntu/automations/`
 
 ---
 
-# Automatisations — Projet Sophie (Mon Espace Pro)
+# Automatisations — Projet Sophie (Mon Adjoint IA)
 
 Dashboard : `https://pro.mon-adjoint-ia.fr/`
 Répertoire : `/home/ubuntu/sophie-dashboard/`
 Service : `sophie-dashboard.service` — port 5006
 
+**Titre header** : "Mon Adjoint IA" (affiché à côté du logo dans la navbar)
+**Tagline** : "Des outils digitaux qui travaillent pour vous"
+**Breakpoint mobile** : menu hamburger actif sous 1084px
+
+---
+
+## Site statique `mon-adjoint-ia.fr`
+
+**Chemin VPS** : `/var/www/mon-adjoint-ia/`
+**Domaine** : `mon-adjoint-ia.fr` (servi par Nginx, fichiers statiques uniquement — pas de Flask)
+
+**Structure** :
+
+```
+/var/www/mon-adjoint-ia/
+├── index.html           (28 Ko — page vitrine principale)
+├── mentions-legales.html (9,8 Ko)
+├── cgv.html             (12 Ko)
+├── css/style.css
+├── js/main.js
+└── assets/img/sophie.webp
+```
+
+**`index.html`** — page vitrine de Mon Adjoint IA. Sections principales :
+- Accroche : "Marre de passer vos dimanches sur la paperasse ?"
+- Problèmes ciblés (H3) : journées pleines, outils dispersés, outils tout-faits inadaptés
+- Processus en 3 étapes : observer le métier → construire l'agent → il travaille, vous validez
+- Agents présentés (H3) : base de données client, liste d'attente, factures automatisées, prospection ciblée
+- Section "Sophie Boutemy" + formulaire de contact "Regardons ensemble ce qu'on peut retirer de vos épaules"
+
+**`mentions-legales.html`** — deux parties :
+1. Mentions légales : éditeur du site, hébergement, propriété intellectuelle, données personnelles, responsabilité
+2. Annexe — Accord de sous-traitance RGPD (DPA) : articles A.1 à A.9 (objet, rôles, traitements, sous-traitance ultérieure, sécurité, conservation, violations, droits des personnes, sort des données)
+
+**`cgv.html`** — 10 articles : identification prestataire, objet, description des services (catalogue agents + caractère évolutif), tarifs, maintenance mensuelle (contenu inclus / exclusions / hébergement alternatif), garantie de bon fonctionnement, obligations client, durée et résiliation, responsabilité, droit applicable.
+
+Ces deux pages sont liées depuis le footer des deux dashboards (`https://mon-adjoint-ia.fr/mentions-legales.html`, `https://mon-adjoint-ia.fr/cgv.html`).
+
+---
+
+## Interface — éléments communs (Sophie ET Chloé)
+
+Les éléments suivants sont présents sur **les deux dashboards** (`sophie-dashboard/templates/base.html` et `chloe-dashboard/templates/base.html`) :
+
+- **Footer global** : Mentions légales (→ `https://mon-adjoint-ia.fr/mentions-legales.html`), CGV (→ `https://mon-adjoint-ia.fr/cgv.html`), RGPD, Contact, sophieboutemy.fr, mon-adjoint-ia.fr. Copyright via context_processor `inject_year`. Lien RGPD → `/rgpd` chez Sophie (page info), `/politique-confidentialite` chez Chloé (la route `/rgpd` de Chloé étant la purge élèves).
+- **Menu hamburger** : breakpoint 1084px (`@media (max-width: 1083px)`), bouton `.nav-hamburger`, toggle JS inline dans `base.html`.
+- **Icône déconnexion** : SVG logout dans `.nav-logout`, pas de texte "Déconnexion".
+- **Tagline** : "Des outils digitaux qui travaillent pour vous" sous le logo (les deux dashboards).
+- **Sous-menu Adjoint Prospection** : présent sur toutes les pages du module (`prospection`, `contacts`, `today`, `funnel`, `priorite`, `profile`). Bouton "Contacts" à gauche (orange), trois boutons "Profil expéditeur / À traiter / Entonnoir" groupés à droite avec état actif. Lien retour "← Tableau de bord Adjoint Prospection" sous le titre, sauf sur la page principale.
+
 ---
 
 ## Adjoint Prospection
 
-**Ce qu'il fait** : recherche d'entreprises par codes NAF et département via l'API Annuaire Entreprises (données ouvertes), enrichissement automatique (site web + email par scraping BeautifulSoup4), gestion d'une base de contacts avec statuts, notes, export CSV.
+**Ce qu'il fait** : recherche d'entreprises par codes NAF/département (France), mots-clés/cantons (Suisse), mots-clés/provinces (Belgique), enrichissement automatique (site web + email), gestion d'une base de contacts avec statuts, notes, export CSV/XLSX, rédaction et envoi d'emails de prospection.
 
 **Dashboard** : `pro.mon-adjoint-ia.fr` — module "Adjoint Prospection"
 
-**Outils connectés** : API Annuaire Entreprises (sans clé), BeautifulSoup4 (scraping), SQLite (`prospection/contacts.db`)
+**Pays supportés** :
+- 🇫🇷 France — API Annuaire Entreprises (`recherche-entreprises.api.gouv.fr`), codes NAF, filtre département et taille
+- 🇨🇭 Suisse — API Zefix REST (`zefix.ch`), mots-clés, filtre canton — `prospection/scraper_ch.py`
+- 🇧🇪 Belgique — API KBO/BCE (`api.kbo-bce.fgov.be`), mots-clés, filtre province — `prospection/scraper_be.py`
+
+**Logique de recherche** : `runner.py` boucle jusqu'à obtenir N contacts **valides** (avec `site_web` ou `email`) — pas seulement N entreprises brutes. La boucle s'arrête si l'API est épuisée.
 
 **Routes principales** :
 
 | Méthode | Route | Description |
 |---|---|---|
-| GET | `/prospection` | Page principale — stats, tâche en cours, formulaire |
-| POST | `/prospection/run` | Lance une recherche (codes NAF, départements, max résultats) |
+| GET | `/prospection` | Page principale — stats, tâche en cours, formulaire (3 onglets pays) |
+| POST | `/prospection/run` | Lance une recherche (`country=FR/CH/BE`, codes NAF ou mots-clés) |
 | GET | `/prospection/status` | JSON — état de la tâche en cours (polling toutes les 2s) |
 | GET | `/prospection/contacts` | Liste des contacts filtrée et paginée (50/page) |
 | GET | `/prospection/contacts/export.csv` | Export CSV |
+| GET | `/prospection/contacts/export.xlsx` | Export Excel |
 | POST | `/prospection/contacts/delete` | Suppression par IDs |
 | PATCH | `/prospection/contacts/<id>` | Mise à jour inline (statut, notes) |
+| GET | `/prospection/today` | Contacts ajoutés aujourd'hui — liste avec actions d'envoi |
+| GET | `/prospection/priorite` | 15 contacts prioritaires (statuts actifs) — quota SMTP affiché |
+| GET | `/prospection/funnel` | Entonnoir de conversion par statut |
+| GET/POST | `/prospection/profile` | Profil expéditeur — nom, activité, signature, config SMTP, limite quotidienne |
+| GET | `/rgpd` | Page RGPD & Confidentialité (template `rgpd.html`) |
+| GET/POST | `/contact` | Formulaire de contact → `contact@sophieboutemy.fr` via OVH SMTP |
 
 **Fichiers clés** :
 - `app.py` — Flask principal (port 5006)
 - `config.json` — agents IA et clients (données du tableau de bord)
-- `prospection/scraper.py` — API Annuaire Entreprises
+- `prospection/scraper.py` — API Annuaire Entreprises (France)
+- `prospection/scraper_ch.py` — API Zefix (Suisse)
+- `prospection/scraper_be.py` — API KBO/BCE (Belgique)
 - `prospection/enricher.py` — enrichissement site + email
 - `prospection/storage.py` — CRUD SQLite
-- `prospection/runner.py` — thread background + `task_status.json`
+- `prospection/runner.py` — thread background + `task_status.json`, fonctions `start_search`, `start_search_ch`, `start_search_be`
 - `prospection/contacts.db` — base SQLite des contacts
 
 **Statuts contacts** : `nouveau`, `qualifié`, `contacté`, `répondu`, `écarté`
@@ -344,6 +542,41 @@ Service : `sophie-dashboard.service` — port 5006
 
 **config.json** : pilote le contenu du tableau de bord. `status: "active"` → bouton URL visible ; `status: "coming_soon"` → badge "Bientôt disponible".
 
+**Carte Chloé Ludmann** (`_CLIENT_CHECKS` dans `app.py`) : affiche les 5 automations actives de Chloé avec leur statut temps réel — Adjoint Client (log), Adjoint Factures (log), Adjoint Attente (systemd), Adjoint Planning (systemd), Adjoint Prospection (systemd `chloe-dashboard.service`).
+
 **Crons** : aucun — service uniquement piloté par systemd.
+
+### Route `/prospection/profile` — profil expéditeur
+
+**Accès** : `@login_required` — `GET/POST`
+
+Formulaire de configuration de l'identité et du canal d'envoi. Données persistées dans `sophie-dashboard/profil_expediteur.json` (chargé/sauvegardé via `prospection/drafter.py` → `load_profile` / `save_profile`).
+
+**Champs sauvegardés** :
+
+| Champ | Usage |
+|---|---|
+| `prenom` / `nom` | Nom affiché dans les emails sortants |
+| `activite` | Secteur / métier de Sophie (contexte IA) |
+| `proposition_valeur` | Accroche de valeur pour la rédaction IA |
+| `offre` | Offre principale proposée |
+| `signature` | Bloc signature HTML des emails |
+| `smtp_host` / `smtp_port` | Serveur SMTP (défaut `ssl0.ovh.net` / `465`) |
+| `smtp_user` / `smtp_pass` | Credentials SMTP — le mot de passe est préservé si le champ est laissé vide en édition |
+| `smtp_daily_limit` | Quota d'envoi quotidien (défaut `50`) — partagé entre `/prospection/priorite`, `/prospection/today` et l'envoi inline |
+
+Le quota consommé du jour est calculé séparément par `_get_quota()` et affiché sur le formulaire.
+
+### Route `/rgpd` — page d'information
+
+**Accès** : public (pas de `@login_required`) — `GET`
+
+Affiche le template `rgpd.html` : politique de confidentialité et mentions légales RGPD du service. Lien du footer. À distinguer de la route `/rgpd` de Chloé qui est la **purge élèves** (`POST`, protégée).
+
+### Route `/contact` — formulaire de contact
+
+**Accès** : public — `GET/POST`
+
+Formulaire de contact footer. En POST, envoie un email via OVH SMTP SSL port 465 (`ssl0.ovh.net`), depuis `IMAP_EMAIL` (`contact@chloeludmann.fr`), vers `contact@sophieboutemy.fr`.
 
 **Reset mot de passe** : token signé via `itsdangerous` (1h), envoi SMTP OVH SSL port 465 (`ssl0.ovh.net`).
