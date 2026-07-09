@@ -34,7 +34,13 @@ app.secret_key = os.getenv('DASHBOARD_SECRET_KEY', 'changeme-please-set-in-env')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_prefix=1)
 
 DASHBOARD_USER     = os.getenv('DASHBOARD_USER', 'admin')
-DASHBOARD_PASSWORD = os.getenv('DASHBOARD_PASSWORD', 'admin')
+try:
+    DASHBOARD_PASSWORD = os.environ['DASHBOARD_PASSWORD']
+except KeyError:
+    raise RuntimeError(
+        "DASHBOARD_PASSWORD manquant dans .env — obligatoire, aucune valeur par défaut "
+        "n'est utilisée pour ne pas démarrer avec un mot de passe faible."
+    )
 
 SMTP_HOST = 'ssl0.ovh.net'
 SMTP_PORT = 465
