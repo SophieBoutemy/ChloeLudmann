@@ -250,7 +250,8 @@ td.td-link  { cursor:pointer; }
           data-calendly="{{ 'oui' if e.infos_calendly else 'non' }}"
           data-contrat="{{ 'oui' if e.date_contrat else 'non' }}"
           data-newsletter="{{ 'oui' if e.date_newsletter else 'non' }}"
-          data-search="{{ (e.email ~ ' ' ~ e.nom ~ ' ' ~ e.infos ~ ' ' ~ e.infos_calendly ~ ' ' ~ e.resume_mail ~ ' ' ~ e.rattrapage)|lower }}">
+          data-static="{{ (e.email ~ ' ' ~ e.infos_calendly ~ ' ' ~ e.resume_mail)|lower }}"
+          data-search="{{ (e.email ~ ' ' ~ e.nom ~ ' ' ~ e.infos ~ ' ' ~ e.infos_calendly ~ ' ' ~ e.resume_mail ~ ' ' ~ e.rattrapage ~ ' ' ~ e.type_eleve|join(' '))|lower }}">
 
         {# Email — read-only, click → detail #}
         <td class="td-email td-link" onclick="goToEleve('{{ e.id }}')" title="{{ e.email }}">{{ e.email or '—' }}</td>
@@ -553,9 +554,11 @@ function refreshStatutBadge(el) {
 }
 
 function updateRowSearch(row) {
-  const texts = Array.from(row.querySelectorAll('[contenteditable]'))
+  const editableTexts = Array.from(row.querySelectorAll('[contenteditable]'))
     .map(el => el.textContent).join(' ');
-  row.dataset.search = (row.dataset.search.split(' ')[0] + ' ' + texts).toLowerCase();
+  const typeChecked = Array.from(row.querySelectorAll('.ms-wrap input[type=checkbox]:checked'))
+    .map(cb => cb.value).join(' ');
+  row.dataset.search = (row.dataset.static + ' ' + editableTexts + ' ' + typeChecked).toLowerCase();
 }
 
 /* ── Relancer ── */
