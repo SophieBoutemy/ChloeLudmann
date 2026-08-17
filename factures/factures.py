@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Detecte les factures dans les boites mail IMAP, uploade sur Drive, cree les entrees Notion.
-import os, imaplib, email, email.header, io, base64
+import os, imaplib, email, email.header, io, base64, hashlib
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
 
@@ -63,6 +63,37 @@ def is_invoice(filename: str, subject: str) -> bool:
     )
     return 'oui' in response.content[0].text.strip().lower()
 
+IMAGE_MEDIA_TYPES = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png'}
+_MAX_IMAGE_BYTES = 5_000_000  # evite d'envoyer une image demesuree a l'API
+
+def is_invoice_image(filename: str, subject: str, image_bytes: bytes, media_type: str) -> bool:
+    """Verification visuelle via Claude (vision) plutot que texte seul : contrairement aux PDF,
+    les images de facture (photo, scan) ont presque toujours un nom de fichier generique
+    (IMG_1234.jpg, Scan001.png) qui ne donne aucun indice — le contenu doit etre regarde."""
+    if _contains_keyword(filename) or _contains_keyword(subject):
+        return True
+    if len(image_bytes) > _MAX_IMAGE_BYTES:
+        return False
+    client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
+    b64 = base64.b64encode(image_bytes).decode('ascii')
+    response = client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=10,
+        system=[{
+            "type": "text",
+            "text": "Tu identifies si une image represente une facture, un recu ou un justificatif de paiement. Reponds uniquement 'oui' ou 'non'.",
+            "cache_control": {"type": "ephemeral"},
+        }],
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
+                {"type": "text", "text": f"Nom du fichier : {filename}\nObjet du mail : {subject}\n\nEst-ce une facture, un reçu, ou un justificatif de paiement ?"},
+            ],
+        }],
+    )
+    return 'oui' in response.content[0].text.strip().lower()
+
 # ── Google Drive ──────────────────────────────────────────────────────────────
 
 def _drive_service():
@@ -113,21 +144,42 @@ def _notion_headers():
         'Content-Type': 'application/json',
     }
 
-def find_notion_entry(nom: str):
-    """Cherche une entree Notion existante par nom de facture (identifiant stable deja utilise par le systeme)."""
+def _content_hash(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+def find_notion_entry(nom: str) -> list:
+    """Retourne TOUTES les entrees Notion partageant ce nom de fichier -- un fournisseur peut
+    reutiliser un nom generique (facture.pdf) pour des factures differentes, donc le nom seul
+    ne suffit pas a identifier un doublon (voir find_matching_entry)."""
     r = requests.post(
         f'https://api.notion.com/v1/databases/{NOTION_DB_ID}/query',
         headers=_notion_headers(),
         json={'filter': {'property': 'Nom de la facture', 'title': {'equals': nom}}},
     )
-    results = r.json().get('results', []) if r.ok else []
-    return results[0] if results else None
+    return r.json().get('results', []) if r.ok else []
+
+def find_matching_entry(nom: str, content_hash: str, received_iso: str):
+    """Parmi les entrees partageant ce nom de fichier, retrouve celle qui correspond vraiment :
+    priorite au hash de contenu (fiable a 100%) ; a defaut de hash enregistre (anciennes
+    entrees), on se rabat sur la date de reception du mail."""
+    candidates = find_notion_entry(nom)
+    for c in candidates:
+        existing_hash = ''.join(t['plain_text'] for t in c.get('properties', {}).get('Hash contenu', {}).get('rich_text', []))
+        if existing_hash and existing_hash == content_hash:
+            return c
+    for c in candidates:
+        props = c.get('properties', {})
+        existing_hash = ''.join(t['plain_text'] for t in props.get('Hash contenu', {}).get('rich_text', []))
+        existing_date = (props.get('Date de réception', {}).get('date') or {}).get('start', '')
+        if not existing_hash and existing_date and existing_date == received_iso:
+            return c
+    return None
 
 def notion_entry_has_drive_link(entry: dict) -> bool:
     return bool(entry.get('properties', {}).get('Lien Drive', {}).get('url'))
 
-def create_notion_entry(nom: str, date_reception: str, expediteur: str, drive_link: str = ''):
-    """Cree une nouvelle entree Notion. L'appelant doit avoir verifie via find_notion_entry qu'elle n'existe pas deja."""
+def create_notion_entry(nom: str, date_reception: str, expediteur: str, drive_link: str = '', content_hash: str = ''):
+    """Cree une nouvelle entree Notion. L'appelant doit avoir verifie via find_matching_entry qu'elle n'existe pas deja."""
     props = {
         'Nom de la facture':     {'title': [{'text': {'content': nom}}]},
         'Date de réception':     {'date': {'start': date_reception}},
@@ -136,6 +188,8 @@ def create_notion_entry(nom: str, date_reception: str, expediteur: str, drive_li
     }
     if drive_link:
         props['Lien Drive'] = {'url': drive_link}
+    if content_hash:
+        props['Hash contenu'] = {'rich_text': [{'text': {'content': content_hash}}]}
     r = requests.post('https://api.notion.com/v1/pages', headers=_notion_headers(), json={
         'parent': {'database_id': NOTION_DB_ID},
         'properties': props,
@@ -156,29 +210,39 @@ def update_notion_drive_link(page_id: str, drive_link: str):
     else:
         print(f"    Notion MAJ lien Drive OK")
 
-def handle_invoice_pdf(filename: str, subject: str, sender: str, received_iso: str, year: str, fetch_bytes):
-    """Deduplique via Notion (nom de facture) avant tout upload Drive ou creation Notion."""
-    existing = find_notion_entry(filename)
+def handle_invoice_file(filename: str, subject: str, sender: str, received_iso: str, year: str,
+                         file_bytes: bytes, is_image: bool = False) -> None:
+    """Deduplique via nom de fichier + hash de contenu (ou date de reception a defaut) avant
+    tout upload Drive ou creation Notion. Fonctionne pour un PDF ou une image (facture photo/scan)."""
+    content_hash = _content_hash(file_bytes)
+    existing = find_matching_entry(filename, content_hash, received_iso)
     if existing:
         if notion_entry_has_drive_link(existing):
             print(f"    -> Deja traite (Notion + Drive), ignore")
             return
         print(f"    -> Facture deja connue sans lien Drive, nouvelle tentative d'upload")
-        drive_link = upload_to_drive(filename, fetch_bytes(), year)
+        drive_link = upload_to_drive(filename, file_bytes, year)
         if drive_link:
             print(f"    Drive OK : {drive_link[:60]}")
             update_notion_drive_link(existing['id'], drive_link)
         return
 
-    if not is_invoice(filename, subject):
+    if is_image:
+        ext = os.path.splitext(filename)[1].lower()
+        media_type = IMAGE_MEDIA_TYPES.get(ext, 'image/jpeg')
+        detected = is_invoice_image(filename, subject, file_bytes, media_type)
+    else:
+        detected = is_invoice(filename, subject)
+
+    if not detected:
         print(f"    -> Pas une facture, ignore")
         return
 
     print(f"    -> Facture detectee")
-    drive_link = upload_to_drive(filename, fetch_bytes(), year)
+    drive_link = upload_to_drive(filename, file_bytes, year)
     if drive_link:
         print(f"    Drive OK : {drive_link[:60]}")
-    create_notion_entry(filename, received_iso, sender, drive_link)
+    create_notion_entry(filename, received_iso, sender, drive_link, content_hash)
 
 # ── IMAP ──────────────────────────────────────────────────────────────────────
 
@@ -227,21 +291,24 @@ def process_mailbox(mb: dict):
             received_iso = datetime.today().date().isoformat()
             year         = str(datetime.today().year)
 
-        pdfs = []
+        attachments = []
         for part in msg.walk():
             fname = part.get_filename()
             if not fname:
                 continue
             fname = decode_str(fname)
             ct = part.get_content_type()
-            if ct == 'application/pdf' or fname.lower().endswith('.pdf'):
+            ext = os.path.splitext(fname)[1].lower()
+            is_pdf = ct == 'application/pdf' or ext == '.pdf'
+            is_img = ct.startswith('image/') or ext in IMAGE_MEDIA_TYPES
+            if is_pdf or is_img:
                 payload = part.get_payload(decode=True)
                 if payload:
-                    pdfs.append((fname, payload))
+                    attachments.append((fname, payload, is_img))
 
-        for filename, pdf_bytes in pdfs:
-            print(f"  PDF : {filename} | {subject[:50]}")
-            handle_invoice_pdf(filename, subject, sender, received_iso, year, fetch_bytes=lambda b=pdf_bytes: b)
+        for filename, file_bytes, is_img in attachments:
+            print(f"  {'IMG' if is_img else 'PDF'} : {filename} | {subject[:50]}")
+            handle_invoice_file(filename, subject, sender, received_iso, year, file_bytes, is_image=is_img)
 
     conn.logout()
 
@@ -263,16 +330,20 @@ def get_gmail_service():
             f.write(creds.to_json())
     return build('gmail', 'v1', credentials=creds)
 
-def _gmail_get_pdf_parts(payload: dict) -> list:
+def _gmail_get_attachment_parts(payload: dict) -> list:
+    """Retourne (nom, attachment_id, is_image) pour chaque piece jointe PDF ou image."""
     parts = []
     att_id = payload.get('body', {}).get('attachmentId')
     if att_id and payload.get('filename'):
         fname = payload['filename']
         ct = payload.get('mimeType', '')
-        if ct == 'application/pdf' or fname.lower().endswith('.pdf'):
-            parts.append((fname, att_id))
+        ext = os.path.splitext(fname)[1].lower()
+        is_pdf = ct == 'application/pdf' or ext == '.pdf'
+        is_img = ct.startswith('image/') or ext in IMAGE_MEDIA_TYPES
+        if is_pdf or is_img:
+            parts.append((fname, att_id, is_img))
     for p in payload.get('parts', []):
-        parts.extend(_gmail_get_pdf_parts(p))
+        parts.extend(_gmail_get_attachment_parts(p))
     return parts
 
 def process_gmail_oauth(days: int = 10):
@@ -302,17 +373,16 @@ def process_gmail_oauth(days: int = 10):
                 received_iso = datetime.today().date().isoformat()
                 year         = str(datetime.today().year)
 
-            pdf_parts = _gmail_get_pdf_parts(full['payload'])
-            for filename, att_id in pdf_parts:
-                print(f"  PDF : {filename} | {subject[:50]}")
-
-                def fetch_bytes(msg_id=msg_id, att_id=att_id):
-                    att = svc.users().messages().attachments().get(
-                        userId='me', messageId=msg_id, id=att_id,
-                    ).execute()
-                    return base64.urlsafe_b64decode(att['data'])
-
-                handle_invoice_pdf(filename, subject, sender, received_iso, year, fetch_bytes)
+            att_parts = _gmail_get_attachment_parts(full['payload'])
+            for filename, att_id, is_img in att_parts:
+                print(f"  {'IMG' if is_img else 'PDF'} : {filename} | {subject[:50]}")
+                # Le hash de contenu impose de recuperer les octets tout de suite (avant de savoir
+                # si c'est une facture), plutot que de differer l'appel comme avant.
+                att = svc.users().messages().attachments().get(
+                    userId='me', messageId=msg_id, id=att_id,
+                ).execute()
+                file_bytes = base64.urlsafe_b64decode(att['data'])
+                handle_invoice_file(filename, subject, sender, received_iso, year, file_bytes, is_image=is_img)
     except Exception as e:
         print(f"  Erreur Gmail OAuth : {e}")
 
