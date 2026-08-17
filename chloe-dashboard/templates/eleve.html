@@ -104,6 +104,20 @@
 .type-save-status.ok  { color:#16a34a; }
 .type-save-status.err { color:#b91c1c; }
 
+/* ── Card 2bis : Inscriptions ── */
+.inscriptions-list { display:flex; flex-direction:column; }
+.inscription-item {
+  display:flex; gap:1rem; padding:.6rem 0; border-bottom:1px solid #F0F0F0;
+  font-size:.875rem; align-items:baseline;
+}
+.inscription-item:last-child { border-bottom:none; padding-bottom:0; }
+.inscription-item:first-child { padding-top:0; }
+.inscription-date {
+  flex:0 0 auto; min-width:90px; font-weight:600; color:var(--green);
+  font-variant-numeric:tabular-nums;
+}
+.inscription-desc { color:#262525; }
+
 /* ── Card 3 : Résumé ── */
 .resume-text {
   font-size:.9rem; color:var(--text); line-height:1.65;
@@ -226,12 +240,26 @@
         <div class="info-value {% if not eleve.infos %}empty{% endif %}">{{ eleve.infos or '—' }}</div>
       </div>
 
-      <div class="info-item">
-        <div class="info-label">Infos Calendly</div>
-        <div class="info-value {% if not eleve.infos_calendly %}empty{% endif %}">{{ eleve.infos_calendly or '—' }}</div>
-      </div>
-
     </div>
+  </div>
+</div>
+
+{# ── CARD 2bis : Inscriptions (historique des réservations Calendly) ── #}
+<div class="card" id="inscriptions">
+  <div class="card-header"><h2>Inscriptions</h2></div>
+  <div class="card-body">
+    {% if eleve.inscriptions %}
+    <div class="inscriptions-list">
+      {% for insc in eleve.inscriptions %}
+      <div class="inscription-item">
+        <div class="inscription-date">{{ insc.date or '—' }}</div>
+        <div class="inscription-desc">{{ insc.description }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <span style="color:#cac8c5;">Aucune réservation Calendly enregistrée.</span>
+    {% endif %}
   </div>
 </div>
 

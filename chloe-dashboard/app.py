@@ -194,7 +194,9 @@ FIELD_MAP = {
     'type_eleve':     ("Type d'élève",          'multi_select'),
     'rattrapage':     ('Rattrapage',            'rich_text'),
     'infos':          ('Infos',                 'rich_text'),
-    'infos_calendly': ('Infos Calendly',        'rich_text'),
+    # 'infos_calendly' retiré : c'est désormais un historique accumulé écrit par
+    # imap_to_notion_chloe.py (une réservation par ligne) — une édition manuelle écraserait
+    # le format structuré. Lecture seule côté dashboard, voir _parse_inscriptions().
     'boite_mail':     ('Boîte mail',            'select'),
     'statut_contrat': ('Statut contrat envoyé', 'select'),
 }
@@ -359,8 +361,25 @@ def _build_notion_prop(field_type, value):
     return None
 
 
+def _parse_inscriptions(raw: str) -> list:
+    """Découpe l'historique accumulé de 'Infos Calendly' (une réservation par ligne, format
+    '{date} | {description}') en liste de dicts {date, description} pour affichage."""
+    entries = []
+    for line in (raw or '').split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        if ' | ' in line:
+            date, desc = line.split(' | ', 1)
+        else:
+            date, desc = '', line
+        entries.append({'date': date.strip(), 'description': desc.strip()})
+    return entries
+
+
 def _page_to_eleve(page):
     p = page.get('properties', {})
+    infos_calendly = _notion_prop(p.get('Infos Calendly', {}))
     return {
         'id':              page['id'],
         'notion_url':      page.get('url', ''),
@@ -371,7 +390,8 @@ def _page_to_eleve(page):
         'infos':           _notion_prop(p.get('Infos', {})),
         'boite_mail':      _notion_prop(p.get('Boîte mail', {})),
         'date_mail':       _notion_prop(p.get('Date du mail', {})),
-        'infos_calendly':  _notion_prop(p.get('Infos Calendly', {})),
+        'infos_calendly':  infos_calendly,
+        'inscriptions':    _parse_inscriptions(infos_calendly),
         'resume_mail':     _notion_prop(p.get('Résumé du mail', {})),
         'date_newsletter': _notion_prop(p.get('Date Newsletter envoyée', {})),
         'date_contrat':    _notion_prop(p.get('Date contrat envoyé', {})),

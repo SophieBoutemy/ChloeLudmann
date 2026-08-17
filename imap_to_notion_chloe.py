@@ -407,6 +407,15 @@ def extract_name_from_subject(subject: str) -> str:
     return ""
 
 
+def extract_slot_from_subject(subject: str) -> str:
+    """Intitulé du créneau (heure, date, nom de la prestation) — tout ce qui suit le nom de
+    l'invité·e dans un sujet Calendly natif ('Nouvel événement: {invité} - {heure} ... - {type de cours}')."""
+    m = re.search(r'(?:nouvel\s+événement|mise\s+à\s+jour|annul[ée])\s*:\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-]+?\s*-\s*(\d.+)$', subject.strip(), re.IGNORECASE)
+    if m:
+        return re.sub(r"\s+", " ", m.group(1)).strip()
+    return ""
+
+
 def parse_date_header(date_str: str) -> str:
     from email.utils import parsedate_to_datetime
     try:
@@ -498,6 +507,7 @@ def parse_calendly_email(em: dict) -> dict:
     subject_name = extract_name_from_subject(em["subject"])
     nom_eleve = subject_name or result.get("nom_eleve") or ""
     result["nom_eleve"] = _drop_if_chloe(nom_eleve)
+    result["slot_subject"] = extract_slot_from_subject(em["subject"])
     return result
 
 
@@ -569,6 +579,14 @@ def _format_resume_entry(date_mail: str, resume: str) -> str:
     return resume
 
 
+def _chunk_rich_text(text: str, max_len: int = 2000) -> list:
+    """Découpe un texte en segments rich_text Notion ≤2000 caractères (limite par bloc, pas par
+    propriété) — évite de tronquer l'historique quand il grossit."""
+    if not text:
+        return [{"text": {"content": ""}}]
+    return [{"text": {"content": text[i:i + max_len]}} for i in range(0, len(text), max_len)]
+
+
 def upsert_event(notion: NotionClient, events_cache: dict,
                  titre: str, email_addr: str, date_mail: str,
                  info_calendly: str, resume: str, boite: str = "",
@@ -590,8 +608,6 @@ def upsert_event(notion: NotionClient, events_cache: dict,
         _date_ok = False
     if _date_ok:
         props["Date du mail"] = {"date": {"start": date_mail}}
-    if info_calendly:
-        props["Infos Calendly"] = {"rich_text": [{"text": {"content": info_calendly[:2000]}}]}
     if boite:
         props["Boîte mail"] = {"select": {"name": boite}}
 
@@ -599,6 +615,16 @@ def upsert_event(notion: NotionClient, events_cache: dict,
     name_key  = f"name:{nom_complet.strip().lower()}" if nom_complet else ""
     key = email_key or name_key
     existing_pages = events_cache.get(key, []) if key else []
+
+    if info_calendly:
+        # Historique accumulé (une réservation par ligne), jamais écrasé — voir upsert_event.__doc__
+        if existing_pages:
+            ic_parts      = existing_pages[0].get("properties", {}).get("Infos Calendly", {}).get("rich_text", [])
+            existing_text = "".join(p["plain_text"] for p in ic_parts)
+            combined      = f"{existing_text}\n{info_calendly}".strip() if existing_text else info_calendly
+        else:
+            combined = info_calendly
+        props["Infos Calendly"] = {"rich_text": _chunk_rich_text(combined)}
 
     if resume:
         new_entry = _format_resume_entry(date_mail, resume)
@@ -640,8 +666,10 @@ def process_email(notion: NotionClient, em: dict, events_cache: dict, processed_
         heure_cours = data.get("heure_cours") or ""
         date_mail   = data.get("date_mail") or date_mail
 
-        date_label    = format_date_fr(date_cours, heure_cours) if date_cours else ""
-        info_calendly = " - ".join(p for p in ["Calendly", type_evt.capitalize(), date_label] if p)
+        date_label   = format_date_fr(date_cours, heure_cours) if date_cours else ""
+        slot_subject = data.get("slot_subject", "") or " - ".join(p for p in [type_evt.capitalize(), date_label] if p)
+        description  = " — ".join(p for p in [type_evt.capitalize(), slot_subject] if p) or "Calendly"
+        info_calendly = f"{date_mail or '?'} | {description}"
         nom_eleve = nom_eleve.strip()
         titre = nom_eleve if nom_eleve else (email_eleve.split("@")[0] if email_eleve else "Sans nom")
 
