@@ -76,6 +76,10 @@ td.td-date { color:var(--muted); font-size:.775rem; }
 }
 .btn-drive:hover { background:#dce8d0; }
 
+.btn-sm-orange:disabled { opacity:.5; cursor:not-allowed; }
+.select-cell { text-align:center; width:32px; }
+.select-toggle { width:16px; height:16px; cursor:pointer; accent-color:var(--green); }
+
 .alert-error {
   background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;
   border-radius:6px; padding:.75rem 1rem; margin-bottom:1.1rem; font-size:.875rem;
@@ -126,7 +130,7 @@ td.td-date { color:var(--muted); font-size:.775rem; }
   </div>
   <div class="filters-row2">
     <button class="btn-sm btn-sm-green" id="btn-refresh" onclick="refreshFactures()">Rafraîchir</button>
-    <button class="btn-sm btn-sm-outline" onclick="openDrive()">📁 Accéder au dossier Drive</button>
+    <button class="btn-sm btn-sm-orange" id="btn-download-zip" onclick="downloadZip()" disabled>⬇ Télécharger la sélection (.zip)</button>
   </div>
 </div>
 
@@ -134,9 +138,11 @@ td.td-date { color:var(--muted); font-size:.775rem; }
   <table>
     <thead>
       <tr>
+        <th class="select-cell"><input type="checkbox" class="select-toggle" id="select-all" onchange="toggleSelectAll(this)"></th>
         <th>Nom de la facture</th>
         <th>Date de réception</th>
         <th>Expéditeur</th>
+        <th>Boîte mail</th>
         <th style="text-align:center;">Envoyée à la comptable</th>
         <th>Lien Drive</th>
       </tr>
@@ -148,9 +154,14 @@ td.td-date { color:var(--muted); font-size:.775rem; }
           data-date="{{ f.date[:7] if f.date else '' }}"
           data-comptable="{{ 'oui' if f.comptable else 'non' }}"
           data-search="{{ (f.nom ~ ' ' ~ f.expediteur)|lower }}">
+        <td class="select-cell">
+          <input type="checkbox" class="select-toggle facture-select" data-id="{{ f.id }}"
+                 onclick="event.stopPropagation()" onchange="updateZipButton()">
+        </td>
         <td class="td-nom" title="{{ f.nom }}">{{ f.nom or '—' }}</td>
         <td class="td-date">{{ f.date or '—' }}</td>
         <td>{{ f.expediteur or '—' }}</td>
+        <td>{{ f.boite_mail or '—' }}</td>
         <td class="check-cell">
           <input type="checkbox" class="check-toggle"
                  {% if f.comptable %}checked{% endif %}
@@ -166,24 +177,50 @@ td.td-date { color:var(--muted); font-size:.775rem; }
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="5" class="empty-state">Aucune facture trouvée.</td></tr>
+      <tr><td colspan="7" class="empty-state">Aucune facture trouvée.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 
 <script>
-const FACTURES_BASE   = "{{ url_for('factures') }}";
-const FACTURES_EXPORT = "{{ url_for('factures_export') }}";
-const FACTURES_REFRESH= "{{ url_for('factures_refresh') }}";
-const DRIVE_URL       = "{{ drive_url }}";
+const FACTURES_BASE     = "{{ url_for('factures') }}";
+const FACTURES_EXPORT   = "{{ url_for('factures_export') }}";
+const FACTURES_REFRESH  = "{{ url_for('factures_refresh') }}";
+const FACTURES_ZIP      = "{{ url_for('factures_download_zip') }}";
 
-function openDrive() {
-  if (!DRIVE_URL) {
-    alert("URL du dossier Drive non configurée.\nAjouter DRIVE_FACTURES_URL dans le .env.");
-    return;
-  }
-  window.open(DRIVE_URL, '_blank');
+function toggleSelectAll(master) {
+  document.querySelectorAll('.facture-row').forEach(row => {
+    if (row.style.display === 'none') return; // ne touche pas aux lignes filtrées/masquées
+    const box = row.querySelector('.facture-select');
+    if (box) box.checked = master.checked;
+  });
+  updateZipButton();
+}
+
+function updateZipButton() {
+  const checked = document.querySelectorAll('.facture-select:checked').length;
+  const btn = document.getElementById('btn-download-zip');
+  btn.disabled = checked === 0;
+  btn.textContent = checked > 0
+    ? `⬇ Télécharger la sélection (.zip) — ${checked}`
+    : '⬇ Télécharger la sélection (.zip)';
+}
+
+function downloadZip() {
+  const ids = Array.from(document.querySelectorAll('.facture-select:checked')).map(b => b.dataset.id);
+  if (!ids.length) return;
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = FACTURES_ZIP;
+  ids.forEach(id => {
+    const input = document.createElement('input');
+    input.type = 'hidden'; input.name = 'ids'; input.value = id;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
 }
 
 function applyFilters() {

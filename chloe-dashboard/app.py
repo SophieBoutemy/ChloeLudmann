@@ -8,6 +8,7 @@ import hashlib
 import hmac as _hmac
 import subprocess
 import uuid
+import zipfile
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -50,6 +51,8 @@ DRIVE_FACTURES_URL  = os.getenv('DRIVE_FACTURES_URL', '')
 NOTION_ELEVES_DB   = '35eafa74cfc980d092d0e80644bd6be7'
 NOTION_FACTURES_DB = '327afa74cfc980328301eec9bb7996e5'
 NOTION_BASE        = 'https://api.notion.com/v1'
+DRIVE_TOKEN_FILE   = '/home/ubuntu/automations/token.json'
+_DRIVE_FILE_ID_RE  = re.compile(r'/file/d/([a-zA-Z0-9_-]+)')
 FACTURES_SCRIPT    = '/home/ubuntu/automations/factures/factures.py'
 
 DOCAGE_EMAIL   = os.getenv('DOCAGE_EMAIL', '')
@@ -889,6 +892,7 @@ def _page_to_facture(page):
         'expediteur':  _notion_prop(p.get('Expéditeur', p.get('Expediteur', p.get('De', {})))),
         'comptable':   _checkbox(['Envoyée à la comptable', 'Comptable', 'Envoyée']),
         'lien_drive':  _notion_prop(p.get('Lien Drive', p.get('Drive', p.get('URL', p.get('Fichier', {}))))),
+        'boite_mail':  _notion_prop(p.get('Boîte mail', {})),
     }
 
 
@@ -943,8 +947,7 @@ def factures():
         error = None
     except Exception as e:
         data, error = [], str(e)
-    return render_template('factures.html', factures=data, error=error,
-                           drive_url=DRIVE_FACTURES_URL)
+    return render_template('factures.html', factures=data, error=error)
 
 
 @app.route('/factures/export.xlsx')
@@ -1028,6 +1031,68 @@ def facture_detail(page_id):
     except Exception as e:
         facture, error = None, str(e)
     return render_template('facture.html', facture=facture, error=error)
+
+
+def _drive_service_readonly():
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+    creds = Credentials.from_authorized_user_file(
+        DRIVE_TOKEN_FILE,
+        scopes=['https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/drive.file'],
+    )
+    if not creds.valid and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        with open(DRIVE_TOKEN_FILE, 'w') as f:
+            f.write(creds.to_json())
+    return build('drive', 'v3', credentials=creds)
+
+
+@app.route('/factures/download-zip', methods=['POST'])
+@login_required
+def factures_download_zip():
+    ids = request.form.getlist('ids')
+    if not ids:
+        return jsonify({'ok': False, 'error': 'Aucune facture sélectionnée.'}), 400
+
+    by_id = {f['id']: f for f in fetch_factures()}
+    selected = [by_id[i] for i in ids if i in by_id]
+    if not selected:
+        return jsonify({'ok': False, 'error': 'Factures introuvables.'}), 400
+
+    try:
+        svc = _drive_service_readonly()
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Connexion Drive impossible : {e}'}), 500
+
+    from googleapiclient.http import MediaIoBaseDownload
+
+    buf = io.BytesIO()
+    used_names = set()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for f in selected:
+            m = _DRIVE_FILE_ID_RE.search(f.get('lien_drive') or '')
+            if not m:
+                continue
+            try:
+                file_buf = io.BytesIO()
+                downloader = MediaIoBaseDownload(file_buf, svc.files().get_media(fileId=m.group(1)))
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+                name = f['nom'] or f'{m.group(1)}.pdf'
+                base, ext = os.path.splitext(name)
+                n = 1
+                while name in used_names:
+                    name = f'{base} ({n}){ext}'
+                    n += 1
+                used_names.add(name)
+                zf.writestr(name, file_buf.getvalue())
+            except Exception as e:
+                print(f"Erreur telechargement zip pour {f['nom']}: {e}")
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name='factures.zip', mimetype='application/zip')
 
 
 # ── Routes : liste d'attente ──────────────────────────────────────────────────
