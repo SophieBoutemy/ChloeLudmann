@@ -100,6 +100,8 @@ Exécution en 5 étapes chaque dimanche à 21h :
 
 **Compte actif : `SophieBoutemy`** (migration terminée le 2026-07-09, suite à un ancien token `lapetitefabriquedigitale` compromis — exposé en clair dans une sortie de commande — et révoqué).
 
+**Token GitHub actuel** : régénéré le 2026-08-17 — token classique (`ghp_...`), configuré sans expiration ou avec une expiration longue (pas un token à courte durée). Le précédent token (mis en place le 2026-07-09) avait expiré autour du 2026-08-02, ce qui a fait échouer silencieusement le push automatique de `backup_complet.sh` pendant 3 semaines (voir rule 6 sur `deploy_check.sh` pour la logique de garde-fous équivalente côté déploiement — ici il n'y en avait pas côté push git). Si le push échoue à nouveau avec `could not read Username for 'https://github.com'`, vérifier d'abord `~/.git-credentials` (existence, taille non nulle, absence de CRLF) avant de soupçonner le token lui-même.
+
 - **Repo Chloé** : `https://github.com/SophieBoutemy/ChloeLudmann.git` — dans `~/automations`, branche `main`.
 - **Repo Sophie** : `https://github.com/SophieBoutemy/MonEspacePro.git` — dans `~/sophie-dashboard`, branche `main`.
 - **Repo sophieboutemy.fr** : `https://github.com/SophieBoutemy/sophieboutemy.git` — dans `~/sites-statiques/sophieboutemy`, branche `master`.
