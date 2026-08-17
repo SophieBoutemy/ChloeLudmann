@@ -639,14 +639,47 @@ def find_possible_email_merge(events_cache: dict, email_key: str, nom_complet: s
 
 
 def flag_possible_merge(notion: NotionClient, page_id: str, note: str) -> None:
-    """Ajoute une note de revue manuelle dans 'Infos' sans écraser les notes déjà présentes."""
+    """Ajoute une note de revue manuelle dans 'Infos' sans écraser les notes déjà présentes.
+    Idempotent : si la même note y figure déjà (passage périodique précédent), ne la répète pas."""
     page = _notion_call(notion.pages.retrieve, page_id=page_id)
     parts = page.get("properties", {}).get("Infos", {}).get("rich_text", [])
     existing = "".join(p["plain_text"] for p in parts)
+    if note in existing:
+        return
     combined = f"{existing}\n{note}".strip() if existing else note
     _notion_call(notion.pages.update, page_id=page_id, properties={
         "Infos": {"rich_text": _chunk_rich_text(combined)},
     })
+
+
+def scan_all_for_possible_merges(notion: NotionClient, events_cache: dict) -> list:
+    """Balaie TOUTE la base (pas seulement les emails entrants du run) pour détecter les paires
+    email quasi-identique + nom similaire déjà présentes en base. Flague les deux fiches de
+    chaque paire (idempotent, jamais de fusion). Retourne la liste des paires trouvées pour log."""
+    email_keys = [k for k in events_cache if not k.startswith("name:")]
+    seen_pairs, found = set(), []
+    for key_a in email_keys:
+        page_a = events_cache[key_a][0]
+        nom_a_parts = page_a.get("properties", {}).get("Nom complet", {}).get("rich_text", [])
+        nom_a = "".join(p["plain_text"] for p in nom_a_parts)
+        if not nom_a:
+            continue
+        match = find_possible_email_merge(events_cache, key_a, nom_a)
+        if not match:
+            continue
+        key_b, page_b = match
+        pair = frozenset({key_a, key_b})
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
+        nom_b_parts = page_b.get("properties", {}).get("Nom complet", {}).get("rich_text", [])
+        nom_b = "".join(p["plain_text"] for p in nom_b_parts)
+        flag_possible_merge(notion, page_a["id"],
+                             f"⚠️ Fusion possible avec {key_b} (email très proche, nom similaire) — à vérifier manuellement")
+        flag_possible_merge(notion, page_b["id"],
+                             f"⚠️ Fusion possible avec {key_a} (email très proche, nom similaire) — à vérifier manuellement")
+        found.append((key_a, nom_a, key_b, nom_b))
+    return found
 
 
 def upsert_event(notion: NotionClient, events_cache: dict,
@@ -792,6 +825,15 @@ def main():
     print("Chargement des donnees Notion...")
     events_cache = load_all_events_bulk(notion)
     cleanup_event_duplicates(notion, events_cache)
+
+    print("Recherche de quasi-doublons (email tres proche + nom similaire)...")
+    merges = scan_all_for_possible_merges(notion, events_cache)
+    if merges:
+        print(f"  {len(merges)} paire(s) signalee(s) pour revue manuelle :")
+        for a, nom_a, b, nom_b in merges:
+            print(f"    - {a} ({nom_a})  <->  {b} ({nom_b})")
+    else:
+        print("  Aucune paire suspecte.")
 
     print("Chargement des emails deja traites...")
     processed_ids = load_processed_ids()
