@@ -220,14 +220,29 @@ def resolve_event(client_events: list[dict]) -> tuple[Optional[dict], list[dict]
     return client_events[0], client_events[1:]
 
 
-def find_member_sign_date(transaction: dict, email: str) -> Optional[str]:
+def find_transaction_member(transaction: dict, email: str) -> Optional[dict]:
     """Cherche, parmi les TransactionMembers d'une transaction, celui dont l'email correspond
-    a l'eleve, et retourne son SignDate (None si absent ou si le membre n'a pas signe)."""
+    a l'eleve (par opposition a Chloe elle-meme, egalement membre de la transaction)."""
     email_l = email.strip().lower()
     for member in (transaction.get("TransactionMembers") or []):
         if (member.get("Email") or "").strip().lower() == email_l:
-            return member.get("SignDate")
+            return member
     return None
+
+
+# MemberStatus (schema Docage, verifie le 17/08/2026) :
+#   0 FormToFill | 1 Pending (jamais consulte) | 2 Processing (a consulte) | 3 Validated
+#   4 Signed | 5 Refused
+# Utilise uniquement quand SignDate est absent (transaction au statut brut "Expire") pour
+# detailler pourquoi -- ne doit jamais retomber silencieusement dans une seule case fourre-tout,
+# c'est exactement le type de bug deja rencontre deux fois sur ce script.
+MEMBER_STATUS_EXPIRY_DETAIL: dict[int, str] = {
+    0: "Formulaire à remplir",
+    1: "Jamais ouvert",
+    2: "Consulté (non signé)",
+    3: "Validé (non signé)",
+    5: "Refusé (élève)",
+}
 
 
 # ── Build Notion event properties ───────────────────────────────────────────────
@@ -240,19 +255,30 @@ def build_event_props(entry: dict, first_name: str, last_name: str, email: str,
     reminder_date = parse_date(entry.get("ModificationDate")) if notion_status == "Relancé" else None
     nom           = f"{first_name} {last_name}".strip() or email
     signature_date = None
+    expiry_detail  = None
 
     # Le lien Docage expire au bout de 30 jours meme si l'eleve a deja signe avant -- le
     # TransactionStatus brut (6/Expired) ne suffit donc pas a lui seul. On verifie le SignDate
-    # individuel de l'eleve, qui doit prevaloir sur un statut "Expire" trompeur.
+    # individuel de l'eleve, qui doit prevaloir sur un statut "Expire" trompeur. Si l'eleve n'a
+    # toujours pas signe, on precise pourquoi (jamais ouvert / consulte / etc.) dans une
+    # propriete separee, sans complexifier "Statut contrat envoye".
     if status_int == 6:
         transaction_id = entry.get("TransactionId", "")
         if transaction_id:
             try:
                 transaction = docage.get_transaction(transaction_id)
-                sign_date_raw = find_member_sign_date(transaction or {}, email)
+                member = find_transaction_member(transaction or {}, email)
+                sign_date_raw = member.get("SignDate") if member else None
                 if sign_date_raw:
                     notion_status  = "Signé"
                     signature_date = parse_date(sign_date_raw)
+                else:
+                    member_status = member.get("MemberStatus") if member else None
+                    expiry_detail = MEMBER_STATUS_EXPIRY_DETAIL.get(member_status)
+                    if expiry_detail is None:
+                        expiry_detail = "Statut inconnu"
+                        log.warning(f"  MemberStatus inattendu ({member_status!r}) pour {email} "
+                                    f"(transaction {transaction_id}), verifier manuellement")
             except requests.HTTPError as e:
                 log.warning(f"  Verification signature impossible pour {email} "
                             f"(transaction {transaction_id}) : {e}")
@@ -268,6 +294,8 @@ def build_event_props(entry: dict, first_name: str, last_name: str, email: str,
         props["Date de relance"] = {"date": {"start": reminder_date}}
     if signature_date:
         props["Date de signature"] = {"date": {"start": signature_date}}
+    if expiry_detail:
+        props["Détail expiration"] = {"select": {"name": expiry_detail}}
 
     return props
 
