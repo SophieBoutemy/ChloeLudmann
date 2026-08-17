@@ -36,17 +36,28 @@ log = logging.getLogger(__name__)
 
 # ── TransactionStatus mapping ───────────────────────────────────────────────────
 #
-# Docage integer status codes (observed: 5=Signé, 6=Expiré/En attente).
-# Adjust if other values appear in your account.
+# Verifie le 17/08/2026 contre le schema officiel Docage (api.docage.com/swagger/v1/swagger.json,
+# composant TransactionStatus) :
+#   -100 All (webhooks uniquement) | 0 Draft | 1 Scheduled | 2 FormToFill | 3 Active
+#   4 Validated | 5 Signed | 6 Expired | 7 Refused | 8 Aborted
 #
+# L'ancien mapping avait deux erreurs : le code 3 (Active = envoye, en attente de signature)
+# etait mappe a tort sur "Relance", et le code 6 (Expired) etait mappe sur "En attente" alors
+# qu'une transaction expiree n'est plus signable en l'etat -- observe en pratique sur le lot du
+# 08/07/2026 : 33 transactions sur 34 sont au code 6, donc expirees, pas juste "en attente".
+#
+# "Relance" n'est pas un code Docage : c'est un statut propre a ce script, pose uniquement apres
+# un appel reussi a resend_transaction() (voir plus bas) -- jamais via ce mapping.
 TRANSACTION_STATUS: dict[int, str] = {
-    0: "En attente",
-    1: "En attente",
-    2: "En attente",
-    3: "Relancé",
-    4: "En attente",
-    5: "Signé",
-    6: "En attente",
+    0: "En attente",   # Draft
+    1: "En attente",   # Scheduled
+    2: "En attente",   # FormToFill
+    3: "En attente",   # Active
+    4: "En attente",   # Validated
+    5: "Signé",         # Signed
+    6: "Expiré",        # Expired
+    7: "Refusé",        # Refused
+    8: "Annulé",        # Aborted
 }
 
 
@@ -188,7 +199,7 @@ class NotionClient:
 # ── Event helpers ───────────────────────────────────────────────────────────────
 
 def get_page_title(page: dict) -> str:
-    parts = page.get("properties", {}).get("Titre", {}).get("title", [])
+    parts = page.get("properties", {}).get("Nom complet", {}).get("rich_text", [])
     return parts[0]["plain_text"] if parts else ""
 
 
@@ -209,7 +220,7 @@ def build_event_props(entry: dict, first_name: str, last_name: str, email: str) 
 
     props: dict = {
         "Email":                 {"title": [{"text": {"content": email}}]},
-        "Titre":                 {"rich_text": [{"text": {"content": nom}}]},
+        "Nom complet":           {"rich_text": [{"text": {"content": nom}}]},
         "Statut contrat envoyé": {"select": {"name": notion_status}},
     }
     if sent_date:
@@ -248,65 +259,70 @@ def sync(resend_unsigned: bool = False) -> None:
         log.info(f"Box '{box_name}' — {len(entries)} entries")
 
         for entry in entries:
-            contact_id = entry.get("ContactId", "")
-            entry_id   = entry.get("Id", "")
+            entry_id = entry.get("Id", "")
+            try:
+                contact_id = entry.get("ContactId", "")
 
-            if not contact_id:
-                log.warning(f"  Entry {entry_id}: no ContactId, skipping")
+                if not contact_id:
+                    log.warning(f"  Entry {entry_id}: no ContactId, skipping")
+                    continue
+
+                contact = docage.get_contact(contact_id)
+                if not contact:
+                    log.warning(f"  Contact {contact_id} not found, skipping")
+                    continue
+
+                email      = (contact.get("Email") or "").strip()
+                first_name = (contact.get("FirstName") or "").strip()
+                last_name  = (contact.get("LastName")  or "").strip()
+
+                if not email:
+                    log.warning(f"  Contact {contact_id} has no email, skipping")
+                    continue
+
+                email_key = email.lower()
+
+                # ── Notion event : une seule fiche par email dans Élèves ──────
+                nom          = f"{first_name} {last_name}".strip() or email
+                props        = build_event_props(entry, first_name, last_name, email)
+                eleve_evts   = events_by_email.get(email_key, [])
+                to_keep, to_archive = resolve_event(eleve_evts)
+
+                for dup in to_archive:
+                    notion.archive_page(dup["id"])
+                    log.info(f"  Doublon archivé: {get_page_title(dup)!r}")
+
+                if to_keep:
+                    notion.update_event(to_keep["id"], props)
+                    events_by_email[email_key] = [to_keep]
+                    log.info(f"  Event updated  : {nom}")
+                else:
+                    new_event = notion.create_event(props)
+                    events_by_email[email_key] = [new_event]
+                    log.info(f"  Event created  : {nom}")
+
+                # ── Resend uniquement si statut == "En attente" ───────────────
+                transaction_id = entry.get("TransactionId", "")
+                if (resend_unsigned
+                        and transaction_id
+                        and entry.get("CreationDate")
+                        and map_status(entry.get("TransactionStatus", 0)) == "En attente"):
+                    log.info(f"  Resending : transaction {transaction_id} → {email}")
+                    try:
+                        docage.resend_transaction(transaction_id)
+                        log.info(f"  Resent OK : {transaction_id}")
+                        event_page = events_by_email.get(email_key, [None])[0]
+                        if event_page:
+                            notion.update_event(event_page["id"], {
+                                "Statut contrat envoyé": {"select": {"name": "Relancé"}},
+                            })
+                            log.info(f"  Statut → Relancé : {email}")
+                    except requests.HTTPError as e:
+                        log.error(f"  Resend failed ({transaction_id}): {e.response.status_code} {e.response.text[:200]}")
+
+            except Exception as e:
+                log.error(f"  Entry {entry_id} failed, skipping: {e}")
                 continue
-
-            contact = docage.get_contact(contact_id)
-            if not contact:
-                log.warning(f"  Contact {contact_id} not found, skipping")
-                continue
-
-            email      = (contact.get("Email") or "").strip()
-            first_name = (contact.get("FirstName") or "").strip()
-            last_name  = (contact.get("LastName")  or "").strip()
-
-            if not email:
-                log.warning(f"  Contact {contact_id} has no email, skipping")
-                continue
-
-            email_key = email.lower()
-
-            # ── Notion event : une seule fiche par email dans Élèves ──────────
-            nom          = f"{first_name} {last_name}".strip() or email
-            props        = build_event_props(entry, first_name, last_name, email)
-            eleve_evts   = events_by_email.get(email_key, [])
-            to_keep, to_archive = resolve_event(eleve_evts)
-
-            for dup in to_archive:
-                notion.archive_page(dup["id"])
-                log.info(f"  Doublon archivé: {get_page_title(dup)!r}")
-
-            if to_keep:
-                notion.update_event(to_keep["id"], props)
-                events_by_email[email_key] = [to_keep]
-                log.info(f"  Event updated  : {nom}")
-            else:
-                new_event = notion.create_event(props)
-                events_by_email[email_key] = [new_event]
-                log.info(f"  Event created  : {nom}")
-
-            # ── Resend uniquement si statut == "En attente" ─────────────────
-            transaction_id = entry.get("TransactionId", "")
-            if (resend_unsigned
-                    and transaction_id
-                    and entry.get("CreationDate")
-                    and map_status(entry.get("TransactionStatus", 0)) == "En attente"):
-                log.info(f"  Resending : transaction {transaction_id} → {email}")
-                try:
-                    docage.resend_transaction(transaction_id)
-                    log.info(f"  Resent OK : {transaction_id}")
-                    event_page = events_by_email.get(email_key, [None])[0]
-                    if event_page:
-                        notion.update_event(event_page["id"], {
-                            "Statut contrat envoyé": {"select": {"name": "Relancé"}},
-                        })
-                        log.info(f"  Statut → Relancé : {email}")
-                except requests.HTTPError as e:
-                    log.error(f"  Resend failed ({transaction_id}): {e.response.status_code} {e.response.text[:200]}")
 
 
 # ── Entry point ─────────────────────────────────────────────────────────────────
