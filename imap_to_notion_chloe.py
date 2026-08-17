@@ -504,7 +504,9 @@ def parse_calendly_email(em: dict) -> dict:
 # Notion
 
 def load_all_events_bulk(notion: NotionClient) -> dict:
-    """Charge tous les événements dans {email_addr: [pages]}."""
+    """Charge tous les événements dans un cache indexé par email ; à défaut d'email, indexé par
+    une clé de secours "name:{nom complet normalisé}" pour rester comparable aux autres fiches
+    sans email (voir upsert_event)."""
     events, cursor = {}, None
     while True:
         r = notion.databases.query(
@@ -512,15 +514,21 @@ def load_all_events_bulk(notion: NotionClient) -> dict:
             **{"start_cursor": cursor} if cursor else {},
         )
         for page in r.get("results", []):
-            email_parts = page["properties"].get("Email", {}).get("title", [])
-            addr = email_parts[0]["plain_text"].strip().lower() if email_parts else ""
+            props = page["properties"]
+            email_parts = props.get("Email", {}).get("title", [])
+            addr = "".join(p["plain_text"] for p in email_parts).strip().lower() if email_parts else ""
             if addr:
                 events.setdefault(addr, []).append(page)
+            else:
+                nom_parts = props.get("Nom complet", {}).get("rich_text", [])
+                nom = "".join(p["plain_text"] for p in nom_parts).strip().lower()
+                if nom:
+                    events.setdefault(f"name:{nom}", []).append(page)
         if not r.get("has_more"):
             break
         cursor = r.get("next_cursor")
     total = sum(len(v) for v in events.values())
-    print(f"  {total} événements chargés ({len(events)} emails uniques)")
+    print(f"  {total} événements chargés ({len(events)} clés uniques)")
     return events
 
 
@@ -565,7 +573,11 @@ def upsert_event(notion: NotionClient, events_cache: dict,
                  titre: str, email_addr: str, date_mail: str,
                  info_calendly: str, resume: str, boite: str = "",
                  nom_complet: str = "") -> tuple[str, bool]:
-    """Met à jour l'événement existant (clé = email_addr), ou en crée un. Retourne (page_id, created)."""
+    """Met à jour l'événement existant, ou en crée un. Retourne (page_id, created).
+    Clé de dédoublonnage : email en priorité ; si aucun email n'a pu être extrait, on se rabat
+    sur le nom complet normalisé ("name:{nom}") pour rester comparable aux autres fiches sans
+    email. Deux personnes homonymes sans email fourniraient la même clé de secours et seraient
+    fusionnées à tort — limite acceptée, l'email reste la clé fiable dès qu'il est disponible."""
     if info_calendly:
         resume = ""  # les emails Calendly ne touchent jamais "Résumé du mail"
     props: dict = {"Email": {"title": [{"text": {"content": (email_addr or titre)[:200]}}]}}
@@ -583,8 +595,10 @@ def upsert_event(notion: NotionClient, events_cache: dict,
     if boite:
         props["Boîte mail"] = {"select": {"name": boite}}
 
-    key = email_addr.lower().strip() if email_addr else ""
-    existing_pages = events_cache.get(key, [])
+    email_key = email_addr.lower().strip() if email_addr else ""
+    name_key  = f"name:{nom_complet.strip().lower()}" if nom_complet else ""
+    key = email_key or name_key
+    existing_pages = events_cache.get(key, []) if key else []
 
     if resume:
         new_entry = _format_resume_entry(date_mail, resume)
