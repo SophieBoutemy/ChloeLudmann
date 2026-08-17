@@ -20,6 +20,7 @@ TOKEN_FILE = os.path.join(os.path.dirname(__file__), '..', 'token.json')
 MAILBOXES = [
     {
         'label':    'OVH Chloe',
+        'boite':    'Chloé Ludmann',
         'email':    os.environ['IMAP_EMAIL'],
         'password': os.environ['IMAP_PASSWORD'],
         'host':     'ssl0.ovh.net',
@@ -27,6 +28,7 @@ MAILBOXES = [
     },
     {
         'label':    'Infomaniak Whisper',
+        'boite':    'Whisper',
         'email':    os.environ['IMAP_EMAIL_WHISPER'],
         'password': os.environ['IMAP_PASSWORD_WHISPER'],
         'host':     'mail.infomaniak.com',
@@ -36,27 +38,31 @@ MAILBOXES = [
 
 # ── Claude ────────────────────────────────────────────────────────────────────
 
-INVOICE_KEYWORDS = {'invoice', 'facture', 'inv', 'receipt', 'recu', 'recus', 'billing', 'statement', 'payment confirmation', 'order confirmation'}
-
-def _contains_keyword(text: str) -> bool:
-    t = text.lower()
-    return any(kw in t for kw in INVOICE_KEYWORDS)
+# Pas de raccourci "accepter si mot-cle facture/invoice present" : une facture dentiste ou
+# veterinaire contient elle aussi ces mots dans son objet. Claude est TOUJOURS interroge, avec
+# un prompt qui juge le caractere professionnel, pas seulement "est-ce une facture".
+_PROFESSIONAL_CONTEXT = (
+    "Chloé est professeure de chant indépendante (cours particuliers, chorale, coaching vocal, "
+    "projet Whisper, ateliers, scènes ouvertes).\n"
+    "Est-ce une facture ou un reçu lié À SON ACTIVITÉ PROFESSIONNELLE — matériel de cours "
+    "(micro, instruments, partitions...), logiciels et abonnements professionnels, comptable, "
+    "hébergement (site, salle de cours), prestataires professionnels, formation professionnelle, "
+    "assurance professionnelle ?\n"
+    "Réponds 'non' pour toute facture personnelle, même authentique : santé (médecin, dentiste, "
+    "vétérinaire), logement personnel, achats personnels, loisirs, ou tout ce qui n'est pas "
+    "clairement rattaché à l'activité professionnelle de cours de chant.\n"
+    "Réponds uniquement par 'oui' ou 'non'."
+)
 
 def is_invoice(filename: str, subject: str) -> bool:
-    if _contains_keyword(filename) or _contains_keyword(subject):
-        return True
     client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
-    prompt = (
-        f"Nom du fichier : {filename}\n"
-        f"Objet du mail : {subject}\n\n"
-        "Est-ce une facture ou invoice ? Reponds uniquement par 'oui' ou 'non'."
-    )
+    prompt = f"Nom du fichier : {filename}\nObjet du mail : {subject}\n\n{_PROFESSIONAL_CONTEXT}"
     response = client.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=10,
         system=[{
             "type": "text",
-            "text": "Tu identifies si un document est une facture. Reponds uniquement 'oui' ou 'non'.",
+            "text": "Tu identifies si un document est une facture professionnelle légitime pour une professeure de chant indépendante. Réponds uniquement 'oui' ou 'non'.",
             "cache_control": {"type": "ephemeral"},
         }],
         messages=[{"role": "user", "content": prompt}],
@@ -82,8 +88,6 @@ def is_invoice_image(filename: str, subject: str, image_bytes: bytes, media_type
     """Verification visuelle via Claude (vision) plutot que texte seul : contrairement aux PDF,
     les images de facture (photo, scan) ont presque toujours un nom de fichier generique
     (IMG_1234.jpg, Scan001.png) qui ne donne aucun indice — le contenu doit etre regarde."""
-    if _contains_keyword(filename) or _contains_keyword(subject):
-        return True
     if len(image_bytes) > _MAX_IMAGE_BYTES:
         return False
     media_type = _sniff_image_media_type(image_bytes, filename)
@@ -94,14 +98,14 @@ def is_invoice_image(filename: str, subject: str, image_bytes: bytes, media_type
         max_tokens=10,
         system=[{
             "type": "text",
-            "text": "Tu identifies si une image represente une facture, un recu ou un justificatif de paiement. Reponds uniquement 'oui' ou 'non'.",
+            "text": "Tu identifies si une image représente une facture professionnelle légitime pour une professeure de chant indépendante. Réponds uniquement 'oui' ou 'non'.",
             "cache_control": {"type": "ephemeral"},
         }],
         messages=[{
             "role": "user",
             "content": [
                 {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
-                {"type": "text", "text": f"Nom du fichier : {filename}\nObjet du mail : {subject}\n\nEst-ce une facture, un reçu, ou un justificatif de paiement ?"},
+                {"type": "text", "text": f"Nom du fichier : {filename}\nObjet du mail : {subject}\n\n{_PROFESSIONAL_CONTEXT}"},
             ],
         }],
     )
@@ -195,7 +199,7 @@ def find_matching_entry(nom: str, content_hash: str, received_iso: str):
 def notion_entry_has_drive_link(entry: dict) -> bool:
     return bool(entry.get('properties', {}).get('Lien Drive', {}).get('url'))
 
-def create_notion_entry(nom: str, date_reception: str, expediteur: str, drive_link: str = '', content_hash: str = ''):
+def create_notion_entry(nom: str, date_reception: str, expediteur: str, drive_link: str = '', content_hash: str = '', boite: str = ''):
     """Cree une nouvelle entree Notion. L'appelant doit avoir verifie via find_matching_entry qu'elle n'existe pas deja."""
     props = {
         'Nom de la facture':     {'title': [{'text': {'content': nom}}]},
@@ -207,6 +211,8 @@ def create_notion_entry(nom: str, date_reception: str, expediteur: str, drive_li
         props['Lien Drive'] = {'url': drive_link}
     if content_hash:
         props['Hash contenu'] = {'rich_text': [{'text': {'content': content_hash}}]}
+    if boite:
+        props['Boîte mail'] = {'select': {'name': boite}}
     r = requests.post('https://api.notion.com/v1/pages', headers=_notion_headers(), json={
         'parent': {'database_id': NOTION_DB_ID},
         'properties': props,
@@ -228,7 +234,7 @@ def update_notion_drive_link(page_id: str, drive_link: str):
         print(f"    Notion MAJ lien Drive OK")
 
 def handle_invoice_file(filename: str, subject: str, sender: str, received_iso: str, year: str,
-                         file_bytes: bytes, is_image: bool = False) -> None:
+                         file_bytes: bytes, is_image: bool = False, boite: str = '') -> None:
     """Deduplique via nom de fichier + hash de contenu (ou date de reception a defaut) avant
     tout upload Drive ou creation Notion. Fonctionne pour un PDF ou une image (facture photo/scan)."""
     content_hash = _content_hash(file_bytes)
@@ -257,7 +263,7 @@ def handle_invoice_file(filename: str, subject: str, sender: str, received_iso: 
     drive_link = upload_to_drive(filename, file_bytes, year)
     if drive_link:
         print(f"    Drive OK : {drive_link[:60]}")
-    create_notion_entry(filename, received_iso, sender, drive_link, content_hash)
+    create_notion_entry(filename, received_iso, sender, drive_link, content_hash, boite)
 
 # ── IMAP ──────────────────────────────────────────────────────────────────────
 
@@ -326,7 +332,7 @@ def process_mailbox(mb: dict):
 
         for filename, file_bytes, is_img in attachments:
             print(f"  {'IMG' if is_img else 'PDF'} : {filename} | {subject[:50]}")
-            handle_invoice_file(filename, subject, sender, received_iso, year, file_bytes, is_image=is_img)
+            handle_invoice_file(filename, subject, sender, received_iso, year, file_bytes, is_image=is_img, boite=mb['boite'])
 
     conn.logout()
 
@@ -401,7 +407,7 @@ def process_gmail_oauth(days: int = 10):
                     userId='me', messageId=msg_id, id=att_id,
                 ).execute()
                 file_bytes = base64.urlsafe_b64decode(att['data'])
-                handle_invoice_file(filename, subject, sender, received_iso, year, file_bytes, is_image=is_img)
+                handle_invoice_file(filename, subject, sender, received_iso, year, file_bytes, is_image=is_img, boite='Gmail')
     except Exception as e:
         print(f"  Erreur Gmail OAuth : {e}")
 
