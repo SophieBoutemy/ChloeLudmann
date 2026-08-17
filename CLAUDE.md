@@ -249,6 +249,8 @@ Cards actuelles (dans l'ordre) : Adjoint Client, Adjoint Factures, Adjoint Atten
 
 **Logs** : `logs/imap_to_notion_chloe.log`, `logs/docage_to_notion.log`, `logs/daily_summary.log`, `logs/weekly_backup.log`
 
+**À traiter séparément (trouvé le 2026-08-17)** : dans `imap_to_notion_chloe.py`, `upsert_event()` n'écrit jamais le prénom/nom extrait par Claude dans la propriété Notion « Nom complet » — seule la propriété `Email` (qui sert de clé d'upsert) est garantie d'être renseignée. Le `titre` utilisé dans les logs (`OK Cree : {titre}`) reflète donc ce que Claude a extrait, pas nécessairement ce qui apparaît réellement dans la fiche Notion. Correction non faite, hors périmètre du fix de filtrage du même jour.
+
 ---
 
 ## Export Élèves (`export-eleves.service`)
