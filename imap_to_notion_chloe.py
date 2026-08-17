@@ -62,7 +62,11 @@ _SKIP_SUBJECT = re.compile(
 _SKIP_SENDER = re.compile(
     r"noreply@|no-reply@|donotreply@|mailer-daemon@|"
     r"@paypal\.|@stripe\.|@doctolib\.|@amazon\.|@ebay\.|"
-    r"@facebook\.|@instagram\.|@twitter\.|@linkedin\.",
+    r"@facebook\.|@instagram\.|@twitter\.|@linkedin\.|"
+    # Non-élèves connus : prestataire technique, adresses propres de Chloé, tiers professionnel
+    r"sophie\.ledoux\.boutemy@gmail\.com|"
+    r"contact@chloeludmann\.fr|contact@whisper-in-the-rennes\.fr|bour\.chloe0@gmail\.com|"
+    r"coursdechantbordeaux@gmail\.com",
     re.IGNORECASE,
 )
 
@@ -75,12 +79,17 @@ Sujet : {subject}
 Message : {body}
 
 Tu analyses les emails reçus pour Chloé, professeure de chant (cours individuels, chorale, coaching vocal, projet Whisper, scènes ouvertes, ateliers).
-1. Cet email est-il pertinent pour ses activités ?
-- is_client = true : tout mail lié à ses activités — inscription, prise de contact, demande d'information, cours de chant, chorale, coaching vocal, Whisper, scène ouverte, atelier, absence, annulation, retard, rattrapage, question sur les tarifs ou les horaires, réponse à un mail de Chloé concernant ses cours
-- is_client = false : UNIQUEMENT spam, newsletter commerciale, mail automatique (facture, livraison, sécurité, noreply), ou mail sans aucun rapport avec ces activités
-2. Si is_client = true, extrais :
-- prenom : prénom de l'expéditeur ou de l'élève mentionné
-- nom : nom de famille
+
+1. Classe cet email dans une seule des trois catégories (champ categorie) :
+- "eleve" : mail d'un·e élève actuel·le, potentiel·le ou passé·e, ou d'un parent d'élève — inscription, prise de contact pour prendre des cours, demande d'info sur cours/tarifs/horaires, absence, annulation, retard, rattrapage, réponse d'un·e élève à un mail de Chloé concernant SES cours
+- "professionnel" : mail d'un·e prestataire, collègue, partenaire, organisateur·rice logistique, fournisseur, ou toute personne en lien avec l'activité de Chloé mais qui n'est ni élève ni parent d'élève — ex. coordination du projet Whisper ou d'une scène ouverte/atelier avec un·e collaborateur·rice ou un lieu, mail de Chloé elle-même, mail d'un·e prestataire technique ou administratif
+- "hors_sujet" : spam, newsletter commerciale, mail automatique (facture, livraison, sécurité, noreply), ou mail sans aucun rapport avec ces activités
+
+2. is_client = true UNIQUEMENT si categorie = "eleve". Dans tous les autres cas (professionnel ou hors_sujet), is_client = false.
+
+3. Si categorie = "eleve", extrais :
+- prenom : prénom de l'expéditeur ou de l'élève mentionné — laisse "" (chaîne vide) si non identifiable, n'invente jamais de valeur comme "Non spécifié" ou "Inconnu"
+- nom : nom de famille — même règle, "" si non identifiable
 - type_demande : une valeur parmi : absence / annulation / retard / rattrapage / inscription / prise_de_contact / demande_info / chorale / coaching / whisper / scene_ouverte / atelier / autre
 - resume_message : résumé en 1-2 phrases du contenu du mail
 - date_mail : date d'envoi du mail au format YYYY-MM-DD
@@ -243,8 +252,13 @@ def fetch_imap_emails(days: int = DAYS_BACK) -> list:
             continue
         try:
             batch = _fetch_imap_account(account["host"], account["user"], account["password"], account["boite"], days)
-            print(f"  IMAP {account['user']} : {len(batch)} email(s)")
-            emails.extend(batch)
+            candidates = []
+            for em in batch:
+                # Les mails Calendly passent toujours (is_calendly() gère leur traitement en aval)
+                if is_calendly(em) or not (_SKIP_SUBJECT.search(em["subject"]) or _SKIP_SENDER.search(em["from"])):
+                    candidates.append(em)
+            print(f"  IMAP {account['user']} : {len(candidates)}/{len(batch)} email(s) apres filtre")
+            emails.extend(candidates)
         except Exception as e:
             print(f"  IMAP {account['user']} erreur : {e}")
     return emails
@@ -437,6 +451,19 @@ _SUBJECT_KEYWORDS = [
     "annulation cours", "absence cours", "tarif", "horaire cours",
 ]
 
+_UNRELIABLE_NAME = re.compile(
+    r"^(non[\s\-]?(sp[eé]cifi[eé]e?|pr[eé]cis[eé]e?|mentionn[eé]e?)|inconnue?|unknown|none|n/?a)$",
+    re.IGNORECASE,
+)
+
+
+def has_reliable_name(prenom: str, nom: str) -> bool:
+    """Vrai si prenom OU nom est une vraie valeur (pas vide, pas un mot-placeholder type 'Inconnu')."""
+    def _reliable(v: str) -> bool:
+        v = (v or "").strip()
+        return bool(v) and not _UNRELIABLE_NAME.match(v)
+    return _reliable(prenom) or _reliable(nom)
+
 def classify_email(em: dict) -> dict:
     body = em["body"].strip()
     subject_lower = em["subject"].lower()
@@ -591,13 +618,17 @@ def process_email(notion: NotionClient, em: dict, events_cache: dict, processed_
         result = classify_email(em)
         save_processed_id(email_key, processed_ids)
         if not result.get("is_client"):
-            print("  -> Ignore")
+            print(f"  -> Ignore ({result.get('categorie', 'hors_sujet')})")
             return
 
         prenom    = result.get("prenom", "")
         nom       = result.get("nom", "")
         resume    = result.get("resume_message", "")
         date_mail = result.get("date_mail") or date_mail
+
+        if not has_reliable_name(prenom, nom):
+            print(f"  -> REVUE MANUELLE (nom non fiable) : {em['from']} | {em['subject'][:60]}")
+            return
 
         titre = f"{prenom} {nom}".strip() or sender_email.split("@")[0] or "Sans nom"
 
