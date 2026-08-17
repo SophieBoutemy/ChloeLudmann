@@ -125,6 +125,17 @@ class DocageClient:
                 return None
             raise
 
+    def get_transaction(self, transaction_id: str) -> Optional[dict]:
+        """Detail complet d'une transaction, y compris TransactionMembers (avec SignDate par
+        membre) -- necessaire car le TransactionStatus global expire au bout de 30 jours meme
+        si l'eleve a deja signe avant l'expiration du lien."""
+        try:
+            return self._get(f"/Transactions/ById/{transaction_id}")
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                return None
+            raise
+
     def resend_transaction(self, transaction_id: str) -> Any:
         # TODO: confirm exact resend endpoint with Docage support.
         return self._post(f"/Transactions/{transaction_id}/Send")
@@ -209,14 +220,42 @@ def resolve_event(client_events: list[dict]) -> tuple[Optional[dict], list[dict]
     return client_events[0], client_events[1:]
 
 
+def find_member_sign_date(transaction: dict, email: str) -> Optional[str]:
+    """Cherche, parmi les TransactionMembers d'une transaction, celui dont l'email correspond
+    a l'eleve, et retourne son SignDate (None si absent ou si le membre n'a pas signe)."""
+    email_l = email.strip().lower()
+    for member in (transaction.get("TransactionMembers") or []):
+        if (member.get("Email") or "").strip().lower() == email_l:
+            return member.get("SignDate")
+    return None
+
+
 # ── Build Notion event properties ───────────────────────────────────────────────
 
-def build_event_props(entry: dict, first_name: str, last_name: str, email: str) -> dict:
+def build_event_props(entry: dict, first_name: str, last_name: str, email: str,
+                       docage: "DocageClient") -> dict:
     status_int    = entry.get("TransactionStatus", 0)
     notion_status = map_status(status_int)
     sent_date     = parse_date(entry.get("CreationDate"))
     reminder_date = parse_date(entry.get("ModificationDate")) if notion_status == "Relancé" else None
     nom           = f"{first_name} {last_name}".strip() or email
+    signature_date = None
+
+    # Le lien Docage expire au bout de 30 jours meme si l'eleve a deja signe avant -- le
+    # TransactionStatus brut (6/Expired) ne suffit donc pas a lui seul. On verifie le SignDate
+    # individuel de l'eleve, qui doit prevaloir sur un statut "Expire" trompeur.
+    if status_int == 6:
+        transaction_id = entry.get("TransactionId", "")
+        if transaction_id:
+            try:
+                transaction = docage.get_transaction(transaction_id)
+                sign_date_raw = find_member_sign_date(transaction or {}, email)
+                if sign_date_raw:
+                    notion_status  = "Signé"
+                    signature_date = parse_date(sign_date_raw)
+            except requests.HTTPError as e:
+                log.warning(f"  Verification signature impossible pour {email} "
+                            f"(transaction {transaction_id}) : {e}")
 
     props: dict = {
         "Email":                 {"title": [{"text": {"content": email}}]},
@@ -227,6 +266,8 @@ def build_event_props(entry: dict, first_name: str, last_name: str, email: str) 
         props["Date contrat envoyé"] = {"date": {"start": sent_date}}
     if reminder_date:
         props["Date de relance"] = {"date": {"start": reminder_date}}
+    if signature_date:
+        props["Date de signature"] = {"date": {"start": signature_date}}
 
     return props
 
@@ -284,7 +325,7 @@ def sync(resend_unsigned: bool = False) -> None:
 
                 # ── Notion event : une seule fiche par email dans Élèves ──────
                 nom          = f"{first_name} {last_name}".strip() or email
-                props        = build_event_props(entry, first_name, last_name, email)
+                props        = build_event_props(entry, first_name, last_name, email, docage)
                 eleve_evts   = events_by_email.get(email_key, [])
                 to_keep, to_archive = resolve_event(eleve_evts)
 
