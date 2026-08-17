@@ -66,7 +66,19 @@ def is_invoice(filename: str, subject: str) -> bool:
 IMAGE_MEDIA_TYPES = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png'}
 _MAX_IMAGE_BYTES = 5_000_000  # evite d'envoyer une image demesuree a l'API
 
-def is_invoice_image(filename: str, subject: str, image_bytes: bytes, media_type: str) -> bool:
+def _sniff_image_media_type(data: bytes, filename: str = '') -> str:
+    """Devine le vrai type MIME depuis les octets magiques -- ni l'extension du fichier ni le
+    Content-Type declare par l'expediteur ne sont fiables (ex. capture d'ecran renommee .png
+    alors que le contenu reel est un JPEG) ; Claude rejette l'appel si le media_type annonce ne
+    correspond pas au contenu reel."""
+    if data[:8] == b'\x89PNG\r\n\x1a\n':
+        return 'image/png'
+    if data[:3] == b'\xff\xd8\xff':
+        return 'image/jpeg'
+    ext = os.path.splitext(filename)[1].lower()
+    return IMAGE_MEDIA_TYPES.get(ext, 'image/jpeg')
+
+def is_invoice_image(filename: str, subject: str, image_bytes: bytes, media_type: str = '') -> bool:
     """Verification visuelle via Claude (vision) plutot que texte seul : contrairement aux PDF,
     les images de facture (photo, scan) ont presque toujours un nom de fichier generique
     (IMG_1234.jpg, Scan001.png) qui ne donne aucun indice — le contenu doit etre regarde."""
@@ -74,6 +86,7 @@ def is_invoice_image(filename: str, subject: str, image_bytes: bytes, media_type
         return True
     if len(image_bytes) > _MAX_IMAGE_BYTES:
         return False
+    media_type = _sniff_image_media_type(image_bytes, filename)
     client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
     b64 = base64.b64encode(image_bytes).decode('ascii')
     response = client.messages.create(
@@ -228,9 +241,7 @@ def handle_invoice_file(filename: str, subject: str, sender: str, received_iso: 
         return
 
     if is_image:
-        ext = os.path.splitext(filename)[1].lower()
-        media_type = IMAGE_MEDIA_TYPES.get(ext, 'image/jpeg')
-        detected = is_invoice_image(filename, subject, file_bytes, media_type)
+        detected = is_invoice_image(filename, subject, file_bytes)
     else:
         detected = is_invoice(filename, subject)
 
