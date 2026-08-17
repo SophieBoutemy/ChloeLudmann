@@ -353,7 +353,8 @@ def _build_notion_prop(field_type, value):
     if field_type == 'select':
         return {'select': {'name': value} if value else None}
     if field_type == 'multi_select':
-        names = [v.strip() for v in value.split(',') if v.strip()]
+        names = value if isinstance(value, list) else [v.strip() for v in value.split(',') if v.strip()]
+        names = [n.strip() for n in names if n and n.strip()]
         return {'multi_select': [{'name': n} for n in names]}
     return None
 
@@ -365,7 +366,7 @@ def _page_to_eleve(page):
         'notion_url':      page.get('url', ''),
         'email':           _notion_prop(p.get('Email', {})),
         'nom':             _notion_prop(p.get('Nom complet', {})),
-        'type_eleve':      _notion_prop(p.get("Type d'élève", {})),
+        'type_eleve':      [s['name'] for s in p.get("Type d'élève", {}).get('multi_select', [])],
         'rattrapage':      _notion_prop(p.get('Rattrapage', {})),
         'infos':           _notion_prop(p.get('Infos', {})),
         'boite_mail':      _notion_prop(p.get('Boîte mail', {})),
@@ -738,7 +739,10 @@ def eleves_export():
     ws.row_dimensions[1].height = 28
     for row_idx, eleve in enumerate(data, 2):
         for col_idx, (_, key) in enumerate(columns, 1):
-            ws.cell(row=row_idx, column=col_idx, value=eleve.get(key, ''))
+            value = eleve.get(key, '')
+            if isinstance(value, list):
+                value = ', '.join(value)
+            ws.cell(row=row_idx, column=col_idx, value=value)
     for col_idx in range(1, len(columns) + 1):
         ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = 22
     ws.freeze_panes = 'A2'
@@ -797,10 +801,11 @@ def eleve_detail(page_id):
 
     try:
         eleve = fetch_eleve(page_id)
+        opts = fetch_db_select_options()
         error = None
     except Exception as e:
-        eleve, error = None, str(e)
-    return render_template('eleve.html', eleve=eleve, error=error)
+        eleve, opts, error = None, {'type_eleve': []}, str(e)
+    return render_template('eleve.html', eleve=eleve, opts=opts, error=error)
 
 
 @app.route('/eleves/<page_id>/notes', methods=['POST'])

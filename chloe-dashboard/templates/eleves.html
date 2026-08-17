@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Base Élèves — Mon Adjoint IA{% endblock %}
+{% block title %}Base Élèves — Mon Agent IA{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -112,6 +112,29 @@ td.td-link  { cursor:pointer; }
   margin-right:.2rem; margin-bottom:.1rem;
 }
 
+/* Multi-select dropdown (Type d'élève) */
+.ms-wrap { position:relative; }
+.ms-trigger {
+  display:block; min-width:80px; max-width:180px; padding:.2rem .35rem;
+  border:1.5px solid var(--border); border-radius:4px; background:#fff;
+  cursor:pointer; font-family:inherit; text-align:left; outline:none;
+  white-space:normal;
+}
+.ms-trigger:hover { background:#f0f4ee; }
+.ms-dropdown {
+  display:none; position:absolute; top:100%; left:0; z-index:5;
+  background:#fff; border:1px solid var(--border); border-radius:6px;
+  box-shadow:0 4px 14px rgba(0,0,0,.12); padding:.35rem; margin-top:.2rem;
+  min-width:170px; white-space:nowrap;
+}
+.ms-wrap.open .ms-dropdown { display:block; }
+.ms-option {
+  display:flex; align-items:center; gap:.4rem; padding:.25rem .4rem;
+  font-size:.8rem; font-weight:400; cursor:pointer; border-radius:4px;
+}
+.ms-option:hover { background:#f0f4ee; }
+.ms-option input { cursor:pointer; }
+
 /* Relancer / delete buttons */
 .btn-relancer, .btn-delete {
   padding:.2rem .55rem; font-size:.75rem; font-weight:500; font-family:inherit;
@@ -222,7 +245,7 @@ td.td-link  { cursor:pointer; }
           data-id="{{ e.id }}"
           data-statut="{{ e.statut_contrat }}"
           data-boite="{{ e.boite_mail }}"
-          data-type="{{ e.type_eleve }}"
+          data-type="{{ e.type_eleve|join(', ') }}"
           data-rattrapage="{{ 'oui' if e.rattrapage else 'non' }}"
           data-calendly="{{ 'oui' if e.infos_calendly else 'non' }}"
           data-contrat="{{ 'oui' if e.date_contrat else 'non' }}"
@@ -239,14 +262,22 @@ td.td-link  { cursor:pointer; }
                 onblur="saveField(this)">{{ e.nom or '' }}</span>
         </td>
 
-        {# Type d'élève — multi_select dropdown #}
+        {# Type d'élève — multi_select checkboxes #}
         <td>
-          <select class="cell-select" data-id="{{ e.id }}" data-field="type_eleve" onchange="saveSelect(this)">
-            <option value="">—</option>
-            {% for t in opts.type_eleve %}
-            <option value="{{ t }}" {% if t == e.type_eleve or t in e.type_eleve.split(', ') %}selected{% endif %}>{{ t }}</option>
-            {% endfor %}
-          </select>
+          <div class="ms-wrap" data-id="{{ e.id }}" data-field="type_eleve">
+            <button type="button" class="ms-trigger" onclick="toggleMsDropdown(this)">
+              {% if e.type_eleve %}{% for t in e.type_eleve %}<span class="badge-type">{{ t }}</span>{% endfor %}
+              {% else %}<span class="muted">—</span>{% endif %}
+            </button>
+            <div class="ms-dropdown">
+              {% for t in opts.type_eleve %}
+              <label class="ms-option">
+                <input type="checkbox" value="{{ t }}" {% if t in e.type_eleve %}checked{% endif %} onchange="saveMultiSelect(this)">
+                {{ t }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
         </td>
 
         {# Rattrapage — editable rich_text #}
@@ -441,12 +472,62 @@ function saveSelect(el) {
       const row = el.closest('tr');
       if (field === 'boite_mail')     row.dataset.boite  = value;
       if (field === 'statut_contrat') row.dataset.statut = value;
-      if (field === 'type_eleve')     row.dataset.type   = value;
     }
   })
   .catch(() => {
     el.style.boxShadow = '0 0 0 2px #ef4444';
     setTimeout(() => el.style.boxShadow = '', 2000);
+  });
+}
+
+/* ── Multi-select dropdown (Type d'élève) ── */
+function toggleMsDropdown(btn) {
+  const wrap = btn.closest('.ms-wrap');
+  const wasOpen = wrap.classList.contains('open');
+  document.querySelectorAll('.ms-wrap.open').forEach(w => w.classList.remove('open'));
+  if (!wasOpen) wrap.classList.add('open');
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.ms-wrap')) {
+    document.querySelectorAll('.ms-wrap.open').forEach(w => w.classList.remove('open'));
+  }
+});
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function saveMultiSelect(checkbox) {
+  const wrap    = checkbox.closest('.ms-wrap');
+  const id      = wrap.dataset.id;
+  const field   = wrap.dataset.field;
+  const trigger = wrap.querySelector('.ms-trigger');
+  const values  = Array.from(wrap.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+
+  fetch(ELEVES_BASE + '/' + id + '/property', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({field, value: values}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      trigger.innerHTML = values.length
+        ? values.map(v => '<span class="badge-type">' + escapeHtml(v) + '</span>').join('')
+        : '<span class="muted">—</span>';
+      const row = wrap.closest('tr');
+      row.dataset.type = values.join(', ');
+      updateRowSearch(row);
+    } else {
+      trigger.style.boxShadow = '0 0 0 2px #ef4444';
+      setTimeout(() => trigger.style.boxShadow = '', 2000);
+      console.error('Erreur save:', data.error);
+    }
+  })
+  .catch(() => {
+    trigger.style.boxShadow = '0 0 0 2px #ef4444';
+    setTimeout(() => trigger.style.boxShadow = '', 2000);
   });
 }
 
