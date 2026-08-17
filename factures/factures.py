@@ -311,7 +311,10 @@ def process_mailbox(mb: dict):
             ct = part.get_content_type()
             ext = os.path.splitext(fname)[1].lower()
             is_pdf = ct == 'application/pdf' or ext == '.pdf'
-            is_img = ct.startswith('image/') or ext in IMAGE_MEDIA_TYPES
+            # Volontairement restreint au JPEG/PNG (voir IMAGE_MEDIA_TYPES) : le GIF n'est jamais
+            # une facture en pratique (logos de signature, icones de notification) et n'est de
+            # toute facon pas un des deux types geres par _sniff_image_media_type.
+            is_img = ext in IMAGE_MEDIA_TYPES or ct in ('image/jpeg', 'image/png')
             if is_pdf or is_img:
                 payload = part.get_payload(decode=True)
                 if payload:
@@ -350,7 +353,8 @@ def _gmail_get_attachment_parts(payload: dict) -> list:
         ct = payload.get('mimeType', '')
         ext = os.path.splitext(fname)[1].lower()
         is_pdf = ct == 'application/pdf' or ext == '.pdf'
-        is_img = ct.startswith('image/') or ext in IMAGE_MEDIA_TYPES
+        # Restreint au JPEG/PNG -- voir commentaire equivalent dans process_mailbox()
+        is_img = ext in IMAGE_MEDIA_TYPES or ct in ('image/jpeg', 'image/png')
         if is_pdf or is_img:
             parts.append((fname, att_id, is_img))
     for p in payload.get('parts', []):
