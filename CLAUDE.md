@@ -287,7 +287,9 @@ Cards actuelles (dans l'ordre) : Adjoint Client, Adjoint Factures, Adjoint Atten
 
 **Log** : `logs/factures.log`
 
-**Note** : le token Google OAuth (`token.json`) n'a actuellement que le scope `gmail.readonly` — le scope `drive.file` doit être ajouté pour que l'upload Drive fonctionne. Voir `reauth_drive.py`.
+**Note** : le token Google OAuth (`token.json`) n'a actuellement que le scope `gmail.readonly` — le scope `drive.file` doit être ajouté pour que l'upload Drive fonctionne. Voir `reauth_drive.py` (mis à jour le 2026-08-17 avec `prompt='consent'`, pour garantir un `refresh_token` à chaque réauth).
+
+**Compte de service = impasse pour l'upload Drive (testé et écarté le 2026-08-17)** : `factures/service_account.json` existe (`factures-automation@automations-chloe.iam.gserviceaccount.com`) et a bien le rôle "writer" sur le dossier Drive Factures — mais l'**écriture** échoue quand même avec `storageQuotaExceeded : Service Accounts do not have storage quota`. Un compte de service n'a aucun quota de stockage propre ; les deux solutions officielles de Google (Shared Drive, ou délégation "domain-wide") nécessitent toutes les deux un compte **Google Workspace**, indisponible sur un compte personnel `@gmail.com` comme `bour.chloe0@gmail.com`. Ne pas retenter cette piste sans que Chloé passe d'abord sur Workspace. L'upload Drive reste donc sur OAuth utilisateur (`token.json`), qui nécessite une réautorisation navigateur ponctuelle en cas de perte de scope — mais s'est montré stable sans réauth pendant 3+ mois une fois correctement configuré (refresh_token vérifié identique sur 4 sauvegardes hebdomadaires consécutives, 19/07 → 16/08/2026).
 
 ---
 
