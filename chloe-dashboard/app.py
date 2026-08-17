@@ -399,6 +399,7 @@ def _page_to_eleve(page):
         'date_newsletter': _notion_prop(p.get('Date Newsletter envoyée', {})),
         'date_contrat':    _notion_prop(p.get('Date contrat envoyé', {})),
         'statut_contrat':  _notion_prop(p.get('Statut contrat envoyé', {})),
+        'detail_expiration': _notion_prop(p.get('Détail expiration', {})),
         'date_relance':    _notion_prop(p.get('Date de relance', {})),
     }
 

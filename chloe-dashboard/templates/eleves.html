@@ -334,6 +334,9 @@ td.td-link  { cursor:pointer; }
             <option value="{{ s }}" {% if s == e.statut_contrat %}selected{% endif %}>{{ s }}</option>
             {% endfor %}
           </select>
+          {% if e.detail_expiration %}
+          <div class="detail-expiration-cell muted" style="font-size:.72rem;margin-top:2px;{% if e.statut_contrat != 'Expiré' %}display:none;{% endif %}">{{ e.detail_expiration }}</div>
+          {% endif %}
         </td>
 
         {# Relancer — shown if statut = En attente #}
@@ -541,6 +544,11 @@ function refreshStatutBadge(el) {
     relCell.innerHTML = '<button class="btn-relancer" onclick="relancer(event, \'' + id + '\', this)">Relancer</button>';
   } else {
     relCell.innerHTML = '<span class="muted">—</span>';
+  }
+  // Show detail expiration only when statut is Expiré
+  const detailCell = el.parentElement.querySelector('.detail-expiration-cell');
+  if (detailCell) {
+    detailCell.style.display = (value === 'Expiré') ? '' : 'none';
   }
 }
 

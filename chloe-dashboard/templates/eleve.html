@@ -207,6 +207,9 @@
           {% elif eleve.statut_contrat == 'En attente' %}<span class="badge badge-attente">En attente</span>
           {% elif eleve.statut_contrat %}<span class="badge badge-default">{{ eleve.statut_contrat }}</span>
           {% else %}<span style="color:#cac8c5;">—</span>{% endif %}
+          {% if eleve.statut_contrat == 'Expiré' and eleve.detail_expiration %}
+          <div style="font-size:.8rem;color:#8a8782;margin-top:4px;">{{ eleve.detail_expiration }}</div>
+          {% endif %}
         </div>
       </div>
 
