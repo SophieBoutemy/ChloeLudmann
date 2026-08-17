@@ -8,7 +8,7 @@ SCOPES = [
 
 flow = InstalledAppFlow.from_client_secrets_file(
     "/home/ubuntu/automations/credentials.json", SCOPES)
-creds = flow.run_local_server(port=8080, open_browser=False)
+creds = flow.run_local_server(port=8080, open_browser=False, prompt='consent')
 
 with open("/home/ubuntu/automations/token.json", "w") as f:
     f.write(creds.to_json())
