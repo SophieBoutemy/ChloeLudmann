@@ -88,8 +88,8 @@ Tu analyses les emails reçus pour Chloé, professeure de chant (cours individue
 2. is_client = true UNIQUEMENT si categorie = "eleve". Dans tous les autres cas (professionnel ou hors_sujet), is_client = false.
 
 3. Si categorie = "eleve", extrais :
-- prenom : prénom de l'expéditeur ou de l'élève mentionné — laisse "" (chaîne vide) si non identifiable, n'invente jamais de valeur comme "Non spécifié" ou "Inconnu"
-- nom : nom de famille — même règle, "" si non identifiable
+- prenom : prénom de l'expéditeur ou de l'élève mentionné — laisse "" (chaîne vide) si non identifiable, n'invente jamais de valeur comme "Non spécifié" ou "Inconnu". Ne mets JAMAIS le prénom de Chloé elle-même (l'organisatrice/professeure) : si le seul nom présent dans le mail est celui de Chloé, laisse le champ vide ""
+- nom : nom de famille — mêmes règles ("" si non identifiable, jamais "Ludmann"/le nom de Chloé)
 - type_demande : une valeur parmi : absence / annulation / retard / rattrapage / inscription / prise_de_contact / demande_info / chorale / coaching / whisper / scene_ouverte / atelier / autre
 - resume_message : résumé en 1-2 phrases du contenu du mail
 - date_mail : date d'envoi du mail au format YYYY-MM-DD
@@ -401,7 +401,7 @@ def extract_name_from_subject(subject: str) -> str:
     m = re.search(r'\bavec\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-]+?)(?:\s+le\s+\d|$)', subject.strip(), re.IGNORECASE)
     if m:
         return m.group(1).strip()
-    m = re.search(r'(?:nouvel\s+événement|mise\s+à\s+jour)\s*:\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-]+?)\s*-\s*\d', subject, re.IGNORECASE)
+    m = re.search(r'(?:nouvel\s+événement|mise\s+à\s+jour|annul[ée])\s*:\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-]+?)\s*-\s*\d', subject, re.IGNORECASE)
     if m:
         return m.group(1).strip()
     return ""
@@ -464,6 +464,20 @@ def has_reliable_name(prenom: str, nom: str) -> bool:
         return bool(v) and not _UNRELIABLE_NAME.match(v)
     return _reliable(prenom) or _reliable(nom)
 
+
+_CHLOE_NAME_RE = re.compile(r"^chlo[ée]\b.*ludmann|^chlo[ée]\s+bour\b|^chlo[ée]$", re.IGNORECASE)
+
+
+def _looks_like_chloe(name: str) -> bool:
+    """Vrai si ce nom est celui de Chloé elle-même (organisatrice), pas un contact réel."""
+    return bool(_CHLOE_NAME_RE.match((name or "").strip()))
+
+
+def _drop_if_chloe(name: str) -> str:
+    """Vide le nom s'il correspond à Chloé elle-même — évite d'écrire son nom comme celui d'un contact."""
+    return "" if _looks_like_chloe(name) else name
+
+
 def classify_email(em: dict) -> dict:
     body = em["body"].strip()
     subject_lower = em["subject"].lower()
@@ -475,10 +489,15 @@ def classify_email(em: dict) -> dict:
 
 
 def parse_calendly_email(em: dict) -> dict:
+    """Le nom de l'invité·e vient toujours en priorité du sujet (déterministe et fiable pour le
+    format Calendly « Nouvel événement: {invité} - {heure} ... »), jamais du corps HTML — Claude
+    y confond parfois le nom de l'organisatrice (Chloé, mentionnée dans le nom de la prestation)
+    avec celui de la personne qui a réellement réservé."""
     body   = em["body"].strip() or "(corps vide)"
     result = call_claude(CALENDLY_PROMPT.format(subject=em["subject"], body=body[:3000]))
-    if not result.get("nom_eleve"):
-        result["nom_eleve"] = extract_name_from_subject(em["subject"])
+    subject_name = extract_name_from_subject(em["subject"])
+    nom_eleve = subject_name or result.get("nom_eleve") or ""
+    result["nom_eleve"] = _drop_if_chloe(nom_eleve)
     return result
 
 
@@ -544,11 +563,14 @@ def _format_resume_entry(date_mail: str, resume: str) -> str:
 
 def upsert_event(notion: NotionClient, events_cache: dict,
                  titre: str, email_addr: str, date_mail: str,
-                 info_calendly: str, resume: str, boite: str = "") -> tuple[str, bool]:
+                 info_calendly: str, resume: str, boite: str = "",
+                 nom_complet: str = "") -> tuple[str, bool]:
     """Met à jour l'événement existant (clé = email_addr), ou en crée un. Retourne (page_id, created)."""
     if info_calendly:
         resume = ""  # les emails Calendly ne touchent jamais "Résumé du mail"
     props: dict = {"Email": {"title": [{"text": {"content": (email_addr or titre)[:200]}}]}}
+    if nom_complet:
+        props["Nom complet"] = {"rich_text": [{"text": {"content": nom_complet[:200]}}]}
     try:
         __import__("datetime").date.fromisoformat(date_mail[:10]) if date_mail else None
         _date_ok = bool(date_mail)
@@ -606,10 +628,12 @@ def process_email(notion: NotionClient, em: dict, events_cache: dict, processed_
 
         date_label    = format_date_fr(date_cours, heure_cours) if date_cours else ""
         info_calendly = " - ".join(p for p in ["Calendly", type_evt.capitalize(), date_label] if p)
-        titre = nom_eleve.strip() if nom_eleve else (email_eleve.split("@")[0] if email_eleve else "Sans nom")
+        nom_eleve = nom_eleve.strip()
+        titre = nom_eleve if nom_eleve else (email_eleve.split("@")[0] if email_eleve else "Sans nom")
 
         _, created = upsert_event(notion, events_cache, titre,
-                                  email_eleve, date_mail, info_calendly, "", em.get("boite", ""))
+                                  email_eleve, date_mail, info_calendly, "", em.get("boite", ""),
+                                  nom_complet=nom_eleve)
         save_processed_id(email_key, processed_ids)
         action = "Cree" if created else "Mis a jour"
         print(f"  OK {action} : {titre}")
@@ -626,14 +650,19 @@ def process_email(notion: NotionClient, em: dict, events_cache: dict, processed_
         resume    = result.get("resume_message", "")
         date_mail = result.get("date_mail") or date_mail
 
+        nom_complet = f"{prenom} {nom}".strip()
+        if _looks_like_chloe(nom_complet):
+            print(f"  -> REVUE MANUELLE (nom = Chloé elle-même) : {em['from']} | {em['subject'][:60]}")
+            return
         if not has_reliable_name(prenom, nom):
             print(f"  -> REVUE MANUELLE (nom non fiable) : {em['from']} | {em['subject'][:60]}")
             return
 
-        titre = f"{prenom} {nom}".strip() or sender_email.split("@")[0] or "Sans nom"
+        titre = nom_complet or sender_email.split("@")[0] or "Sans nom"
 
         _, created = upsert_event(notion, events_cache, titre,
-                                  sender_email, date_mail, "", resume, em.get("boite", ""))
+                                  sender_email, date_mail, "", resume, em.get("boite", ""),
+                                  nom_complet=nom_complet)
         action = "Cree" if created else "Mis a jour"
         print(f"  OK {action} : {titre}")
 
