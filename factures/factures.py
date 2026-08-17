@@ -16,6 +16,7 @@ ANTHROPIC_KEY        = os.environ['ANTHROPIC_API_KEY']
 CLAUDE_MODEL         = 'claude-haiku-4-5-20251001'
 DRIVE_FOLDER_ID      = os.environ.get('DRIVE_FOLDER_ID', '')
 TOKEN_FILE = os.path.join(os.path.dirname(__file__), '..', 'token.json')
+SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'service_account.json')
 
 MAILBOXES = [
     {
@@ -110,12 +111,16 @@ def is_invoice_image(filename: str, subject: str, image_bytes: bytes, media_type
 # ── Google Drive ──────────────────────────────────────────────────────────────
 
 def _drive_service():
-    from google.oauth2.credentials import Credentials
+    """Compte de service (factures-automation@automations-chloe.iam.gserviceaccount.com),
+    deja partage en ecriture sur le dossier Drive Factures -- n'expire jamais, aucun
+    consentement humain requis, contrairement a l'ancien flow OAuth via token.json (qui reste
+    utilise uniquement pour la lecture Gmail, laquelle ne peut pas passer par un compte de
+    service sur une boite @gmail.com personnelle)."""
+    from google.oauth2 import service_account
     from googleapiclient.discovery import build
-    creds = Credentials.from_authorized_user_file(
-        TOKEN_FILE,
-        scopes=['https://www.googleapis.com/auth/gmail.readonly',
-                'https://www.googleapis.com/auth/drive.file'],
+    creds = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE,
+        scopes=['https://www.googleapis.com/auth/drive'],
     )
     return build('drive', 'v3', credentials=creds)
 
@@ -134,7 +139,7 @@ def _get_or_create_year_folder(svc, year: str) -> str:
     return svc.files().create(body=meta, fields='id').execute()['id']
 
 def upload_to_drive(filename: str, pdf_bytes: bytes, year: str) -> str:
-    if not DRIVE_FOLDER_ID or not os.path.exists(TOKEN_FILE):
+    if not DRIVE_FOLDER_ID or not os.path.exists(SERVICE_ACCOUNT_FILE):
         return ''
     try:
         from googleapiclient.http import MediaIoBaseUpload
@@ -335,8 +340,7 @@ def get_gmail_service():
     from googleapiclient.discovery import build
     creds = Credentials.from_authorized_user_file(
         TOKEN_FILE,
-        scopes=['https://www.googleapis.com/auth/gmail.readonly',
-                'https://www.googleapis.com/auth/drive.file'],
+        scopes=['https://www.googleapis.com/auth/gmail.readonly'],
     )
     if not creds.valid and creds.expired and creds.refresh_token:
         creds.refresh(Request())
