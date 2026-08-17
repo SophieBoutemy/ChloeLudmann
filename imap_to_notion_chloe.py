@@ -587,6 +587,68 @@ def _chunk_rich_text(text: str, max_len: int = 2000) -> list:
     return [{"text": {"content": text[i:i + max_len]}} for i in range(0, len(text), max_len)]
 
 
+def _levenshtein(a: str, b: str) -> int:
+    """Distance d'édition classique (insertions/suppressions/substitutions)."""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        curr = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cost = 0 if ca == cb else 1
+            curr[j] = min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+        prev = curr
+    return prev[-1]
+
+
+def _names_look_similar(a: str, b: str, max_dist: int = 2, max_ratio: float = 0.25) -> bool:
+    """Identique, ou proche en tenant compte de la longueur (évite les faux positifs sur noms
+    courts : 'Aude'/'Anne' sont à distance 2 mais beaucoup trop différents en proportion)."""
+    a, b = a.strip().lower(), b.strip().lower()
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    dist = _levenshtein(a, b)
+    return dist <= max_dist and dist / max(len(a), len(b)) <= max_ratio
+
+
+def find_possible_email_merge(events_cache: dict, email_key: str, nom_complet: str, max_email_dist: int = 2):
+    """Cherche dans le cache un email à 1-2 caractères du nouvel email, avec un nom identique ou
+    très proche — signale une fusion possible, ne fusionne jamais automatiquement (les faux
+    positifs sur des noms communs seraient dangereux)."""
+    if not email_key or not nom_complet:
+        return None
+    for key, pages in events_cache.items():
+        if key.startswith("name:") or key == email_key:
+            continue
+        if abs(len(key) - len(email_key)) > max_email_dist:
+            continue
+        if _levenshtein(key, email_key) > max_email_dist:
+            continue
+        existing_page = pages[0]
+        nom_parts = existing_page.get("properties", {}).get("Nom complet", {}).get("rich_text", [])
+        existing_nom = "".join(p["plain_text"] for p in nom_parts)
+        if _names_look_similar(existing_nom, nom_complet):
+            return key, existing_page
+    return None
+
+
+def flag_possible_merge(notion: NotionClient, page_id: str, note: str) -> None:
+    """Ajoute une note de revue manuelle dans 'Infos' sans écraser les notes déjà présentes."""
+    page = _notion_call(notion.pages.retrieve, page_id=page_id)
+    parts = page.get("properties", {}).get("Infos", {}).get("rich_text", [])
+    existing = "".join(p["plain_text"] for p in parts)
+    combined = f"{existing}\n{note}".strip() if existing else note
+    _notion_call(notion.pages.update, page_id=page_id, properties={
+        "Infos": {"rich_text": _chunk_rich_text(combined)},
+    })
+
+
 def upsert_event(notion: NotionClient, events_cache: dict,
                  titre: str, email_addr: str, date_mail: str,
                  info_calendly: str, resume: str, boite: str = "",
@@ -615,6 +677,19 @@ def upsert_event(notion: NotionClient, events_cache: dict,
     name_key  = f"name:{nom_complet.strip().lower()}" if nom_complet else ""
     key = email_key or name_key
     existing_pages = events_cache.get(key, []) if key else []
+
+    if not existing_pages and email_key:
+        similar = find_possible_email_merge(events_cache, email_key, nom_complet)
+        if similar:
+            similar_key, similar_page = similar
+            print(f"  ATTENTION fusion possible : {email_key} <-> {similar_key} (nom : {nom_complet})")
+            flag_possible_merge(
+                notion, similar_page["id"],
+                f"⚠️ Fusion possible avec {email_key} (email très proche, nom similaire) — à vérifier manuellement",
+            )
+            props["Infos"] = {"rich_text": _chunk_rich_text(
+                f"⚠️ Fusion possible avec {similar_key} (email très proche, nom similaire) — à vérifier manuellement"
+            )}
 
     if info_calendly:
         # Historique accumulé (une réservation par ligne), jamais écrasé — voir upsert_event.__doc__
