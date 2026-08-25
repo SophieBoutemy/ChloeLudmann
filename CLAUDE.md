@@ -111,6 +111,34 @@ Exécution en 5 étapes chaque dimanche à 21h :
 
 ---
 
+## Sites statiques — déploiement SFTP Infomaniak
+
+Les sites `lapetitefabriquedigitale.fr` et `sophieboutemy.fr` (ainsi que `mon-adjoint-ia.fr`, `whisper-in-the-rennes.fr` et d'autres domaines clients) sont hébergés chez **Infomaniak sur un serveur Apache séparé de ce VPS** (ce VPS tourne nginx — `curl -sI` sur ces domaines renvoie `Server: Apache`, ce qui confirme l'hébergement distinct).
+
+**Important** : les dépôts `~/sites-statiques/lapetitefabriquedigitale` et `~/sites-statiques/sophieboutemy` (remotes GitHub `SophieBoutemy/lpfd` et `SophieBoutemy/sophieboutemy`, voir section GitHub ci-dessus) sont de simples **copies de travail versionnées**. Aucun webhook ni CI n'a été trouvé sur ces repos : **`git push` seul ne déploie rien en production**. Le déploiement réel se fait exclusivement par **SFTP manuel** (`lftp` ou tout client SFTP).
+
+**Accès SFTP** :
+- Hôte : `xu1i5p.ftp.infomaniak.com`
+- Port : `22` (SFTP)
+- Utilisateur : `xu1i5p_sophie`
+- Chemins distants (fichiers à la racine du sous-dossier du domaine, pas de `public_html` intermédiaire) :
+  - `lapetitefabriquedigitale.fr` → `/home/clients/d73a391de22a124240ec8b105b45c4ab/sites/lapetitefabriquedigitale.fr/`
+  - `sophieboutemy.fr` → `/home/clients/d73a391de22a124240ec8b105b45c4ab/sites/sophieboutemy.fr/`
+  - D'autres domaines existent sous ce même compte client (`.../sites/` : `mon-adjoint-ia.fr`, `whisper-in-the-rennes.fr`, sites clientes Saint-Acaire/Ephata/Doriane/etc.) — mêmes identifiants.
+
+**Mot de passe** : jamais stocké en clair ici ni sur ce VPS (vérifié le 2026-08-25 : rien dans `.env`, `.bash_history`, `.netrc`, pas de clé SSH dédiée pour ce host). Il est enregistré :
+1. Dans **FileZilla**, sur la machine Windows locale de Sophie (`%APPDATA%\FileZilla\sitemanager.xml`), entrée nommée `lapetitefabriquedigitale` (host `xu1i5p.ftp.infomaniak.com`, user `xu1i5p_sophie`). Encodage base64 dans la balise `<Pass>` (obfuscation, pas un vrai chiffrement) — à décoder.
+2. Sophie peut aussi le donner directement si besoin — voir mémo local côté Windows (`MEMO.txt` à la racine de `C:\Users\sophi\Documents\PRO`).
+
+**Procédure de déploiement** (déjà exécutée avec succès le 2026-08-25 pour une correction de SIRET) :
+1. Corriger le(s) fichier(s) dans `~/sites-statiques/<site>/`, committer et pousser sur GitHub (traçabilité — voir section GitHub).
+2. Récupérer/décoder le mot de passe FileZilla, écrire un script `lftp` temporaire (`open -u xu1i5p_sophie,<mot_de_passe> sftp://xu1i5p.ftp.infomaniak.com`, `cd <chemin_distant>`, `put <fichier_local> -o <fichier_distant>`).
+3. **Piège** : si le script est généré depuis PowerShell, `[System.IO.File]::WriteAllLines` avec `Encoding.UTF8` ajoute un BOM par défaut et fait échouer `lftp` dès la première ligne (`Unknown command`) — utiliser `New-Object System.Text.UTF8Encoding $false` pour écrire sans BOM. Aussi : `lftp ... ls -l <fichier>` échoue parfois sur SFTP même quand le fichier existe (quirk du glob) — préférer `ls` seul pour vérifier une liste de fichiers.
+4. Exécuter `lftp -f script.txt` depuis ce VPS (paquets `lftp` et `python3-paramiko` déjà installés), puis supprimer immédiatement le script (local et distant) car il contient le mot de passe en clair.
+5. **Vérifier via une requête HTTP réelle sur le domaine public** (`curl` avec un paramètre anti-cache), pas seulement via la liste de fichiers SFTP — celle-ci confirme l'upload, pas que le contenu servi a changé.
+
+---
+
 ## Bases Notion utilisées
 
 | Base | ID | Usage |
