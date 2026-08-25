@@ -202,6 +202,12 @@ FIELD_MAP = {
     # le format structuré. Lecture seule côté dashboard, voir _parse_inscriptions().
     'boite_mail':     ('Boîte mail',            'select'),
     'statut_contrat': ('Statut contrat envoyé', 'select'),
+    # 'Email' est la propriété title de la base ET la clé de dédoublonnage utilisée par
+    # imap_to_notion_chloe.py (load_all_events_bulk / upsert_event) pour rattacher les emails
+    # entrants à une fiche existante. La modifier ici est légitime (corriger une adresse mal
+    # captée) mais les prochains emails reçus de l'ancienne adresse ne seront plus rattachés
+    # automatiquement à cette fiche.
+    'email':          ('Email',                 'title'),
 }
 
 
@@ -355,6 +361,8 @@ def _notion_prop(prop):
 def _build_notion_prop(field_type, value):
     if field_type == 'rich_text':
         return {'rich_text': [{'text': {'content': value}}] if value else []}
+    if field_type == 'title':
+        return {'title': [{'text': {'content': value}}] if value else []}
     if field_type == 'select':
         return {'select': {'name': value} if value else None}
     if field_type == 'multi_select':
@@ -362,6 +370,20 @@ def _build_notion_prop(field_type, value):
         names = [n.strip() for n in names if n and n.strip()]
         return {'multi_select': [{'name': n} for n in names]}
     return None
+
+
+def _build_eleve_creation_properties(data):
+    """Construit le dict 'properties' Notion pour la création d'un élève, à partir des
+    champs whitelistés dans FIELD_MAP (email compris, propriété title de la base)."""
+    properties = {}
+    for field, (notion_name, field_type) in FIELD_MAP.items():
+        value = data.get(field)
+        if not value:
+            continue
+        prop = _build_notion_prop(field_type, value)
+        if prop is not None:
+            properties[notion_name] = prop
+    return properties
 
 
 def _parse_inscriptions(raw: str) -> list:
@@ -708,9 +730,28 @@ def index():
 
 # ── Routes : élèves — liste ───────────────────────────────────────────────────
 
-@app.route('/eleves')
+@app.route('/eleves', methods=['GET', 'POST'])
 @login_required
 def eleves():
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        if not (data.get('nom') or '').strip():
+            return jsonify({'ok': False, 'error': 'Le nom est obligatoire.'}), 400
+        try:
+            r = requests.post(
+                f'{NOTION_BASE}/pages',
+                headers=_notion_headers(),
+                json={
+                    'parent': {'database_id': NOTION_ELEVES_DB},
+                    'properties': _build_eleve_creation_properties(data),
+                },
+                timeout=10,
+            )
+            r.raise_for_status()
+            return jsonify({'ok': True, 'id': r.json()['id']})
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e)}), 500
+
     try:
         data = fetch_eleves()
         opts = fetch_db_select_options()

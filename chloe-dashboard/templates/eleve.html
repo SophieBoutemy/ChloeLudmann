@@ -93,13 +93,14 @@
   font-size:.78rem; background:#f0f4ee; color:var(--green); margin-right:.3rem;
 }
 
-/* Type d'élève — checkboxes */
-.type-checkboxes { display:flex; flex-wrap:wrap; gap:.4rem .9rem; }
-.type-checkbox-label {
-  display:flex; align-items:center; gap:.4rem; font-size:.875rem;
-  color:var(--text); cursor:pointer;
+/* Type d'élève — checkboxes, une colonne verticale */
+.type-checkboxes {
+  display:flex; flex-direction:column; gap:.55rem;
+  max-height:260px; overflow-y:auto; padding-right:.3rem;
 }
-.type-checkbox-label input { cursor:pointer; }
+.type-checkbox-row { display:flex; align-items:center; gap:.5rem; }
+.type-checkbox-row input { cursor:pointer; }
+.type-checkbox-row label { font-size:.875rem; color:var(--text); cursor:pointer; }
 .type-save-status { font-size:.8rem; color:var(--muted); margin-left:.5rem; }
 .type-save-status.ok  { color:#16a34a; }
 .type-save-status.err { color:#b91c1c; }
@@ -143,6 +144,27 @@
   background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;
   border-radius:6px; padding:.75rem 1rem; margin-bottom:1.25rem; font-size:.875rem;
 }
+
+/* ── Champs éditables (email, nom, rattrapage, infos) ── */
+[contenteditable="true"] {
+  outline:none; cursor:text; border-radius:4px;
+  padding:.1rem .3rem; margin:-.1rem -.3rem;
+  transition:background .15s, box-shadow .15s;
+}
+[contenteditable="true"]:hover { background:#f0f4ee; }
+[contenteditable="true"]:focus { background:#fff; box-shadow:0 0 0 2px var(--green); }
+[contenteditable="true"].saving { opacity:.5; }
+[contenteditable="true"].saved  { box-shadow:0 0 0 2px #22c55e; }
+[contenteditable="true"].error  { box-shadow:0 0 0 2px #ef4444; }
+[contenteditable="true"]:empty::before { content: attr(data-placeholder); color:#cac8c5; }
+
+/* ── Boîte mail — select éditable ── */
+.field-select {
+  padding:.35rem .6rem; border:1.5px solid var(--border); border-radius:6px;
+  font-size:.9rem; font-family:inherit; color:var(--text); background:#fff;
+  cursor:pointer; outline:none; transition:box-shadow .15s;
+}
+.field-select:focus { border-color:var(--green); }
 </style>
 {% endblock %}
 
@@ -168,8 +190,8 @@
 <div class="card">
   <div class="card-header"><h2>Identité</h2></div>
   <div class="card-body">
-    <div class="identity-email">{{ eleve.email or '—' }}</div>
-    <div class="identity-nom {% if not eleve.nom %}empty{% endif %}">{{ eleve.nom or 'Nom non renseigné' }}</div>
+    <div class="identity-email" contenteditable="true" data-field="email" data-placeholder="Email non renseigné" onblur="saveTextField(this)">{{ eleve.email }}</div>
+    <div class="identity-nom" contenteditable="true" data-field="nom" data-placeholder="Nom non renseigné" onblur="saveTextField(this)">{{ eleve.nom }}</div>
   </div>
 </div>
 
@@ -184,10 +206,10 @@
         <div class="info-value">
           <div class="type-checkboxes" id="type-checkboxes">
             {% for t in opts.type_eleve %}
-            <label class="type-checkbox-label">
-              <input type="checkbox" value="{{ t }}" {% if t in eleve.type_eleve %}checked{% endif %} onchange="saveTypeEleve()">
-              {{ t }}
-            </label>
+            <div class="type-checkbox-row">
+              <input type="checkbox" id="type-eleve-opt-{{ loop.index }}" value="{{ t }}" {% if t in eleve.type_eleve %}checked{% endif %} onchange="saveTypeEleve()">
+              <label for="type-eleve-opt-{{ loop.index }}">{{ t }}</label>
+            </div>
             {% endfor %}
           </div>
           <span class="type-save-status" id="type-save-status"></span>
@@ -196,7 +218,14 @@
 
       <div class="info-item">
         <div class="info-label">Boîte mail</div>
-        <div class="info-value {% if not eleve.boite_mail %}empty{% endif %}">{{ eleve.boite_mail or '—' }}</div>
+        <div class="info-value">
+          <select class="field-select" data-field="boite_mail" onchange="saveSelectField(this)">
+            <option value="">—</option>
+            {% for b in opts.boite_mail %}
+            <option value="{{ b }}" {% if b == eleve.boite_mail %}selected{% endif %}>{{ b }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
 
       <div class="info-item">
@@ -215,7 +244,7 @@
 
       <div class="info-item">
         <div class="info-label">Rattrapage</div>
-        <div class="info-value {% if not eleve.rattrapage %}empty{% endif %}">{{ eleve.rattrapage or '—' }}</div>
+        <div class="info-value" contenteditable="true" data-field="rattrapage" data-placeholder="—" onblur="saveTextField(this)">{{ eleve.rattrapage }}</div>
       </div>
 
       <div class="info-item">
@@ -240,7 +269,7 @@
 
       <div class="info-item">
         <div class="info-label">Infos</div>
-        <div class="info-value {% if not eleve.infos %}empty{% endif %}">{{ eleve.infos or '—' }}</div>
+        <div class="info-value" contenteditable="true" data-field="infos" data-placeholder="—" onblur="saveTextField(this)">{{ eleve.infos }}</div>
       </div>
 
     </div>
@@ -342,6 +371,59 @@ function saveTypeEleve() {
     }
   })
   .catch(() => { status.textContent = 'Erreur réseau.'; status.className = 'type-save-status err'; });
+}
+
+function saveTextField(el) {
+  const field = el.dataset.field;
+  const value = el.textContent.trim();
+  el.classList.add('saving');
+  fetch(ELEVES_BASE + '/' + PAGE_ID + '/property', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({field, value}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    el.classList.remove('saving');
+    if (data.ok) {
+      el.classList.add('saved');
+      setTimeout(() => el.classList.remove('saved'), 1200);
+    } else {
+      el.classList.add('error');
+      setTimeout(() => el.classList.remove('error'), 2000);
+      alert('Erreur : ' + data.error);
+    }
+  })
+  .catch(() => {
+    el.classList.remove('saving');
+    el.classList.add('error');
+    setTimeout(() => el.classList.remove('error'), 2000);
+  });
+}
+
+function saveSelectField(el) {
+  const field = el.dataset.field;
+  const value = el.value;
+  fetch(ELEVES_BASE + '/' + PAGE_ID + '/property', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({field, value}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      el.style.boxShadow = '0 0 0 2px #22c55e';
+      setTimeout(() => el.style.boxShadow = '', 1200);
+    } else {
+      el.style.boxShadow = '0 0 0 2px #ef4444';
+      setTimeout(() => el.style.boxShadow = '', 2000);
+      alert('Erreur : ' + data.error);
+    }
+  })
+  .catch(() => {
+    el.style.boxShadow = '0 0 0 2px #ef4444';
+    setTimeout(() => el.style.boxShadow = '', 2000);
+  });
 }
 
 function relancer() {
